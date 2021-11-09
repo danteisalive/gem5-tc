@@ -302,35 +302,35 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
 
 void
 MacroopBase::injectMicroops(ThreadContext * _tc,
-                            PCState &nextPC, TheISA::CheckType _sym)
+                            PCState &nextPC, TheISA::TyCHEAllocationPoint _sym)
 {
 
 
-    if (_sym == TheISA::CheckType::AP_MALLOC_BASE_COLLECT){
+    if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT){
         injectAPMallocBaseCollector(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_MALLOC_SIZE_COLLECT){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT){
         injectAPMallocSizeCollector(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_FREE_CALL){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL){
         injectAPFreeCall(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_FREE_RET){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_RET){
         injectAPFreeRet(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_BOUNDS_INJECT){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT){
         injectBoundsCheck(nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_CALLOC_BASE_COLLECT){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT){
         injectAPCallocBaseCollector(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_CALLOC_SIZE_COLLECT){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT){
         injectAPCallocSizeCollector(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_REALLOC_BASE_COLLECT){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT){
         injectAPReallocBaseCollector(_tc, nextPC);
       }
-    else if (_sym == TheISA::CheckType::AP_REALLOC_SIZE_COLLECT){
+    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT){
         injectAPReallocSizeCollector(_tc, nextPC);
       }
 

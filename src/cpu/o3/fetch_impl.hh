@@ -1290,7 +1290,7 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
                   si->getNumOfMicroops() <= thisPC.microPC())
               {
                   si->injectMicroops(tc, thisPC,
-                                   TheISA::CheckType::AP_BOUNDS_INJECT);
+                                   TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, -1));
               }
               else {
                 //check to see if there is injecteion from before

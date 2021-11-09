@@ -150,7 +150,7 @@ public:
     void updatePointerTracker(ThreadContext * tc, PCState &nextPC);
 
     void injectMicroops( ThreadContext * _tc, PCState &nextPC,
-                         TheISA::CheckType _sym
+                         TheISA::TyCHEAllocationPoint _sym
                        );
 
     void injectAPMallocBaseCollector(ThreadContext * _tc,PCState &nextPC);

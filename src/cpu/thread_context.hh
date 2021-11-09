@@ -115,10 +115,9 @@ class ThreadContext
     using VecRegContainer = TheISA::VecRegContainer;
     using VecElem = TheISA::VecElem;
   public:
-                    // seqNum effAddr
 
     //Addr here is the AP/DP point address
-    typedef std::map<Addr,  TheISA::CheckType> SymbolCache;
+    typedef std::map<Addr,  TheISA::TyCHEAllocationPoint> SymbolCache;
     typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>
                                                     ShadowMemoryAliasTable;
 

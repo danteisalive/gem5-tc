@@ -320,7 +320,7 @@ ElfObject::ElfObject(const std::string &_filename, size_t _len,
                 data_sec_start = shdr.sh_addr;
             } else if (!strcmp(".bss", sec_name)) {
                 bss_sec_start = shdr.sh_addr;
-            }
+            } 
         } else {
             Elf_Error errorNum = (Elf_Error)elf_errno();
             if (errorNum != ELF_E_NONE) {
@@ -331,6 +331,9 @@ ElfObject::ElfObject(const std::string &_filename, size_t _len,
 
         section = elf_getscn(elf, ++sec_idx);
     }
+
+    tyche.baseAddr = 0x4000000;
+    tyche.size     = 0x800000;
 
     // Go through all the segments in the program, record them, and scrape
     // out information about the text, data, and bss areas needed by other

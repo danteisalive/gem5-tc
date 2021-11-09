@@ -126,6 +126,8 @@ class ObjectFile
     Section data;
     Section bss;
 
+    Section tyche; // We have 8 sections for tyche metadata
+
     bool loadSection(Section *sec, PortProxy& mem_proxy, Addr mask,
                      Addr offset = 0);
     void setGlobalPointer(Addr global_ptr) { globalPtr = global_ptr; }
@@ -138,10 +140,12 @@ class ObjectFile
     Addr textBase() const { return text.baseAddr; }
     Addr dataBase() const { return data.baseAddr; }
     Addr bssBase() const { return bss.baseAddr; }
+    Addr tycheBase() const {  return tyche.baseAddr; }
 
     size_t textSize() const { return text.size; }
     size_t dataSize() const { return data.size; }
     size_t bssSize() const { return bss.size; }
+    size_t tycheSize() const { return tyche.size; }
 
     /* This function allows you to override the base address where
      * a binary is going to be loaded or set it if the binary is just a
@@ -149,6 +153,9 @@ class ObjectFile
      * @param a address to load the binary/text section at
      */
     void setTextBase(Addr a) { text.baseAddr = a; }
+
+    void setTycheBase ( Addr baddr) {tyche.baseAddr = baddr;}
+    void setTycheSize ( size_t sz) {tyche.size = sz;}
 };
 
 ObjectFile *createObjectFile(const std::string &fname, bool raw = false);

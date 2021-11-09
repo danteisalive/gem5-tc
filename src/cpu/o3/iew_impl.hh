@@ -1437,7 +1437,8 @@ DefaultIEW<Impl>::executeInsts()
 
                 if (tc->enableCapability &&
                   inst->isBoundsCheckMicroop() &&
-                  fault == NoFault){
+                  fault == NoFault)
+                {
 
                     if (!inst->isCapabilityChecked())
                     {
@@ -1446,7 +1447,7 @@ DefaultIEW<Impl>::executeInsts()
                         instQueue.deferCapInst(inst);
                         continue;
                     }
-                 }
+                }
 
                 if (inst->isTranslationDelayed() &&
                     fault == NoFault) {
@@ -1582,7 +1583,7 @@ DefaultIEW<Impl>::executeInsts()
                     //fetchRedirect[tid] = true;
                     //squashDueToMispredictedPID(inst, tid);
                     zeroIdiomDueToMisspredictedPID(inst,tid);
-                    //break;
+                    break;
                   case   MisspredictionType::PMAN:
                     //fetchRedirect[tid] = true;
                     //zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
@@ -1765,7 +1766,7 @@ DefaultIEW<Impl>::tick()
                         //fetchRedirect[tid] = true;
                         //squashDueToMispredictedPID(inst, tid);
                         zeroIdiomDueToMisspredictedPID(inst,tid);
-                        //break;
+                        break;
                       case   MisspredictionType::PMAN:
                        // fetchRedirect[tid] = true;
                         //zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);

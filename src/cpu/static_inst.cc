@@ -118,7 +118,7 @@ StaticInst::getMicroops() const
 void
 StaticInst::injectMicroops(ThreadContext * _tc,
                           TheISA::PCState &nextPC,
-                          TheISA::CheckType _sym){
+                          TheISA::TyCHEAllocationPoint _sym){
 
     panic("injectMicroops: This should only be called by a macroop");
 }

@@ -347,7 +347,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     virtual void injectMicroops(ThreadContext * _tc,
                                 TheISA::PCState &nextPC,
-                                TheISA::CheckType _sym
+                                TheISA::TyCHEAllocationPoint _sym
                                );
     bool hasInjection(){ return isInjected; }
 

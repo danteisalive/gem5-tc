@@ -76,7 +76,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
 
     void collector(ThreadContext * _tc,
                 TheISA::PCState &pcState,
-                TheISA::CheckType _sym);
+                TheISA::TyCHEAllocationPoint _sym);
 
     void WarmupAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);
     void updateAliasTable(ThreadContext * _tc, TheISA::PCState &pcState);

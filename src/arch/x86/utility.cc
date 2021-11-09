@@ -85,7 +85,10 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
   elf_version(EV_CURRENT);
 
   fd = open(file_name, O_RDONLY);
+  panic_if(fd == -1, "readSymTab: Can't open file: %s! Error Number % d\n", std::string(file_name), errno);
   elf = elf_begin(fd, ELF_C_READ, NULL);
+//   std::cout << "readSymTab : " << std::string(file_name) << std::endl;
+  assert (elf != NULL);
 
   int i = 0;
   while ((scn = elf_nextscn(elf, scn)) != NULL) {
@@ -95,8 +98,9 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
       i++;
   }
 
-
+  
   ehdr = elf64_getehdr(elf);
+  assert (elf != NULL);
   if (shs_flags.size() > ehdr->e_shnum){
     panic("invalid number of section headers!");
   }

@@ -415,17 +415,19 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             std::ifstream myfile (params->symbol_file);
             if (myfile.is_open()){
                 Addr pcAddr;
+                Addr type_id;
                 uint64_t checkType;
                 while ( std::getline (myfile,line) ){
                     std::istringstream iss(line);
-                    iss >> std::hex >> pcAddr  >> checkType ;
+                    iss >> std::hex >> pcAddr  >> checkType >> type_id;
                     (o3_tc->syms_cache).insert(
-                      std::pair<Addr, TheISA::CheckType>
-                      (pcAddr, (TheISA::CheckType)checkType));
+                          std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                          (pcAddr, TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)checkType, (int64_t)type_id)));
+
                     DPRINTF(Capability,
                       "line:'%s' PCAddr: %#lx CheckType: %s\n",
                       line, pcAddr,
-                      TheISA::CheckTypeToStr((TheISA::CheckType)checkType));
+                      TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)checkType));
                 }
                 myfile.close();
             }
