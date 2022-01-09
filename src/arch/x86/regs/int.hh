@@ -194,6 +194,14 @@ namespace X86ISA
             case 33: return "t16";
             case 34: return "t17";
             case 35: return "t18";
+            case 36: return "t19";
+            case 37: return "t20";
+            case 38: return "t21";
+            case 39: return "t22";
+            case 40: return "t23";
+            case 41: return "t24";
+            case 42: return "t25";
+            case 43: return "t26";
             default:
                 panic("IntRegIndexStr shoudln't be here!");
         }

@@ -276,8 +276,9 @@ PointerDependencyGraph<Impl>::dump(DynInstPtr &inst)
     DPRINTF(TypeTracker, "---------------------------------------------------------------------\n");
     for (size_t i = 0; i < TheISA::NumIntRegs; i++)
     {
-        DPRINTF(TypeTracker, "FetchArchRegsPid[%s]\t=\t[%d]\t\tCommitArchRegsPid[%s]\t=\t[%d]\n", 
-                TheISA::IntRegIndexStr(i), FetchArchRegsPid[i], TheISA::IntRegIndexStr(i), CommitArchRegsPid[i]);
+        if (FetchArchRegsPid[i] != TheISA::PointerID(0) && CommitArchRegsPid[i] != TheISA::PointerID(0))
+            DPRINTF(TypeTracker, "FetchArchRegsPid[%s]\t=\t[%d]\t\tCommitArchRegsPid[%s]\t=\t[%d]\n", 
+                    TheISA::IntRegIndexStr(i), FetchArchRegsPid[i], TheISA::IntRegIndexStr(i), CommitArchRegsPid[i]);
     }
     
 
@@ -312,21 +313,19 @@ template <class Impl>
 void
 PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
 {
-    #define POINTER_DEP_GRAPH_UPDATE_DEBUG 1
+    
 
     if (inst->isBoundsCheckMicroop()) return; // we do not save these
     if (!inst->isLoad()) {
         panic("doUpdate called with a non-load instruction!");
     }
 
-    if (POINTER_DEP_GRAPH_UPDATE_DEBUG)
-    {
-        std::cout <<"--------START----------\n";
-        std::cout << std::dec << "Updating: [" <<
-                  inst->seqNum << "]"<< std::endl;
-        std::cout << "Before Update:\n";
-        dump();
-    }
+    DPRINTF(TypeTracker, "IEW Updating Alias for Instruction: [%d][%s][%s]\n", 
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()));
+    DPRINTF(TypeTracker, "Dependency Graph Before IEW Updating:\n");
+    dump();
 
 
     //find the load uop
@@ -396,12 +395,8 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     //}
 
 
-    // if (POINTER_DEP_GRAPH_COMMIT_DEBUG)
-    // {
-    //     std::cout << "After Update\n";
-    //     dump();
-    //     std::cout << "--------END----------\n";
-    // }
+    DPRINTF(TypeTracker, "Dependency Graph After IEW Updating:\n");
+    dump();
 
 
 
