@@ -15,6 +15,7 @@
  #include "cpu/reg_class.hh"
  #include "enums/OpClass.hh"
  #include "debug/X86.hh"
+ #include "debug/TypeTracker.hh"
 
 
 
@@ -77,6 +78,8 @@ bool MacroopBase::injectCheckMicroops(
         std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid)
 {
 
+  return false; // DISABLE ME!
+  
   if ((numMicroops > 0) && (!isInjected))
   {
 
@@ -396,7 +399,7 @@ if (numMicroops > 0 && !isInjected){
         // remember to set and clear last micro of original microops
         microops[0]->clearFirstMicroop();
 
-
+        DPRINTF(TypeTracker, "Injecting AP Free for PC address: %s\n", nextPC);
         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 1];
 
         for (int i=0; i < numMicroops; i++)
@@ -446,7 +449,7 @@ MacroopBase::injectAPMallocSizeCollector(ThreadContext * _tc, PCState &nextPC){
         // remember to set and clear last micro of original microops
         microops[0]->clearFirstMicroop();
 
-
+        DPRINTF(TypeTracker, "Injecting AP Malloc Size Collector for PC address: %s\n", nextPC);
         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
         for (int i=0; i < numMicroops; i++)
@@ -508,6 +511,7 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
         // remember to set and clear last micro of original microops
         microops[0]->clearFirstMicroop();
 
+        DPRINTF(TypeTracker, "Injecting AP Malloc Base Collector for PC address: %s\n", nextPC);
 
         StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 
@@ -568,7 +572,8 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
 
        // remember to set and clear last micro of original microops
        microops[0]->clearFirstMicroop();
-
+       
+       DPRINTF(TypeTracker, "Injecting AP Calloc Size Collector for PC address: %s\n", nextPC);
 
        StaticInstPtr * microopTemp = new StaticInstPtr[numMicroops + 2];
 

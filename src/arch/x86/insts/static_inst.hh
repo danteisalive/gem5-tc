@@ -80,7 +80,7 @@ namespace X86ISA
 
     class X86StaticInst : public StaticInst
     {
-      protected:
+      public:
         // Constructor.
         X86StaticInst(const char *mnem,
              ExtMachInst _machInst, OpClass __opClass)
@@ -100,6 +100,7 @@ namespace X86ISA
         void printReg(std::ostream &os, RegId reg, int size) const;
         void printSrcReg(std::ostream &os, int reg, int size) const;
         void printDestReg(std::ostream &os, int reg, int size) const;
+        RegIndex getUnflattenRegIndex(RegId reg) const;
         void printMem(std::ostream &os, uint8_t segment,
                 uint8_t scale, RegIndex index, RegIndex base,
                 uint64_t disp, uint8_t addressSize, bool rip) const;

@@ -55,6 +55,9 @@
         "numeric": "cpp",
         "ratio": "cpp",
         "system_error": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "cfenv": "cpp",
+        "random": "cpp",
+        "*.inc": "cpp"
     }
 }

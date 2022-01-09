@@ -119,6 +119,23 @@ namespace X86ISA
             printReg(os, _destRegIdx[reg], size);
     }
 
+    RegIndex 
+    X86StaticInst::getUnflattenRegIndex(RegId reg) const
+    {
+        RegIndex reg_idx = reg.index();
+
+        panic_if(!reg.isIntReg(), "this function is only for int regs!\n");
+
+           
+        reg_idx &= ~IntFoldBit;
+
+        assert(reg_idx < 38);
+
+        return reg_idx;
+            
+
+    }
+
     void
     X86StaticInst::printReg(std::ostream &os, RegId reg, int size) const
     {
@@ -192,6 +209,9 @@ namespace X86ISA
                 break;
               case INTREG_R15W:
                 ccprintf(os, longFormats[size], "15");
+                break;
+              case INTREG_R16W:
+                ccprintf(os, longFormats[size], "16");
                 break;
               default:
                 ccprintf(os, microFormats[size], reg_idx - NUM_INTREGS);

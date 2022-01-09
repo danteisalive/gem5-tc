@@ -1,0 +1,59 @@
+scons: Reading SConscript files ...
+Warning: Your compiler doesn't support incremental linking and lto at the same time, so lto is being disabled. To force lto on anyway, use the --force-lto option. That will disable partial linking.
+Warning: protoc version 3.7.2 or newer required.
+         Installed version: 3.0.0 
+Checking for C header file Python.h... (cached) yes
+Checking for C library python2.7... (cached) yes
+Checking for C library pthread... (cached) yes
+Checking for C library dl... (cached) yes
+Checking for C library util... (cached) yes
+Checking for C library m... (cached) yes
+Checking for accept(0,0,0) in C++ library None... (cached) yes
+Checking for zlibVersion() in C++ library z... (cached) yes
+Checking for C header file valgrind/valgrind.h... (cached) no
+Checking for clock_nanosleep(0,0,NULL,NULL) in C library None... (cached) yes
+Checking for timer_create(CLOCK_MONOTONIC, NULL, NULL) in C library None... (cached) no
+Checking for timer_create(CLOCK_MONOTONIC, NULL, NULL) in C library rt... (cached) yes
+Checking for C library tcmalloc... (cached) no
+Checking for C library tcmalloc_minimal... (cached) no
+You can get a 12% performance improvement by installing tcmalloc (libgoogle-perftools-dev package on Ubuntu or RedHat).
+Checking for char temp; backtrace_symbols_fd((void*)&temp, 0, 0) in C library None... (cached) yes
+Checking for C header file fenv.h... (cached) yes
+Checking for C header file png.h... (cached) yes
+Checking for C header file linux/kvm.h... (cached) yes
+Checking for C header file linux/if_tun.h... (cached) yes
+Checking size of struct kvm_xsave ... (cached) yes
+Checking for member exclude_host in struct perf_event_attr...(cached) yes
+Checking whether __i386__ is declared... (cached) no
+Checking whether __x86_64__ is declared... (cached) yes
+Building in /home/dante/gem5-tc/build/X86
+Using saved variables file /home/dante/gem5-tc/build/variables/X86
+scons: done reading SConscript files.
+scons: Building targets ...
+ [     CXX] X86/cpu/o3/probe/simple_trace.cc -> .o
+ [VER TAGS]  -> X86/sim/tags.cc
+ [     CXX] X86/python/_m5/param_DerivO3CPU.cc -> .o
+ [     CXX] X86/python/_m5/param_O3Checker.cc -> .o
+ [     CXX] X86/python/_m5/param_SimpleTrace.cc -> .o
+ [     CXX] X86/cpu/o3/base_dyn_inst.cc -> .o
+ [     CXX] X86/cpu/o3/commit.cc -> .o
+ [    LINK]  -> X86/sim/power/lib.o.partial
+ [     CXX] X86/cpu/o3/cpu.cc -> .o
+ [     CXX] X86/cpu/o3/deriv.cc -> .o
+ [     CXX] X86/cpu/o3/decode.cc -> .o
+ [     CXX] X86/cpu/o3/dyn_inst.cc -> .o
+ [     CXX] X86/cpu/o3/fetch.cc -> .o
+ [     CXX] X86/cpu/o3/iew.cc -> .o
+ [     CXX] X86/cpu/o3/inst_queue.cc -> .o
+ [     CXX] X86/cpu/o3/lsq.cc -> .o
+ [     CXX] X86/cpu/o3/lsq_unit.cc -> .o
+ [     CXX] X86/cpu/o3/mem_dep_unit.cc -> .o
+ [     CXX] X86/cpu/o3/rename.cc -> .o
+ [     CXX] X86/cpu/o3/rob.cc -> .o
+ [     CXX] X86/cpu/o3/thread_context.cc -> .o
+ [     CXX] X86/cpu/o3/pointer_dep_graph.cc -> .o
+ [     CXX] X86/cpu/o3/checker.cc -> .o
+ [    LINK]  -> X86/cpu/o3/lib.o.partial
+ [     CXX] X86/base/date.cc -> .o
+ [    LINK]  -> X86/gem5.opt
+scons: done building targets.

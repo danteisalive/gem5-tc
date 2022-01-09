@@ -49,7 +49,7 @@ namespace X86ISA
      */
     class RegOpBase : public X86MicroopBase
     {
-      protected:
+      public:
         const RegIndex src1;
         const RegIndex dest;
         const uint8_t dataSize;
@@ -91,7 +91,7 @@ namespace X86ISA
 
     class RegOp : public RegOpBase
     {
-      protected:
+      public:
         const RegIndex src2;
         const uint8_t dataSize;
         // Constructor
@@ -124,7 +124,7 @@ namespace X86ISA
 
     class RegOpImm : public RegOpBase
     {
-      protected:
+      public:
         const uint8_t imm8;
         const uint8_t dataSize;
         // Constructor

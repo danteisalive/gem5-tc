@@ -158,8 +158,8 @@ bool readSymTab(const char* file_name, ThreadContext *tc){
 
               const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
               std::string s1(pStr);
-              // std::cout  <<  std::hex << sym.st_value << std::dec <<
-              //           " " << sym.st_size << " " << s1  << std::endl;
+            //   std::cout  <<  std::hex << sym.st_value << std::dec <<
+            //             " " << sym.st_size << " " << s1  << std::endl;
 
               Block fake;
               fake.payload = (Addr)sym.st_value;
@@ -271,6 +271,7 @@ void initCPU(ThreadContext *tc, int cpuId)
     for (int index = 0; index < NumMicroIntRegs; index++) {
         tc->setIntReg(INTREG_MICRO(index), 0);
     }
+    
 
     for (int index = 0; index < NumImplicitIntRegs; index++) {
         tc->setIntReg(INTREG_IMPLICIT(index), 0);
