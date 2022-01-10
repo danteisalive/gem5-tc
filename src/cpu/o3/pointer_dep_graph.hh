@@ -140,7 +140,12 @@ class PointerDependencyGraph
     unsigned memAllocCounter;
 
     void TransferMovMicroops(DynInstPtr &inst);
+    void TransferStoreMicroops(DynInstPtr &inst);
+    void TransferLoadMicroops(DynInstPtr &inst);
     void TransferAddMicroops(DynInstPtr &inst);
+    void TransferSubMicroops(DynInstPtr &inst);
+    void TransferAddImmMicroops(DynInstPtr &inst);
+    void TransferSubImmMicroops(DynInstPtr &inst);
 
   public:
     // Debug variable, remove when done testing.

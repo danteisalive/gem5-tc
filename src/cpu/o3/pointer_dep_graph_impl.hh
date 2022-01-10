@@ -104,40 +104,8 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
 
 
     else if (inst->staticInst->getName() == "mov") {TransferMovMicroops(inst);}
-    
-    // this can be a potential pointer refill
-    // else if (inst->isLoad() && inst->staticInst->getDataSize() == 8)
-    // {
-    //     // get the predicted PID for this load
-    //     TheISA::PointerID _pid = inst->macroop->getMacroopPid();
-    //     // insert an entry for the destination reg
-    //     for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-    //         if (inst->staticInst->destRegIdx(i).isIntReg() &&
-    //             (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-    //         {
-    //             int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-    //             dependGraph[dest_reg_idx].push_front(
-    //                                           PointerDepEntry(inst, _pid));
-    //             FetchArchRegsPid[dest_reg_idx] = _pid;
-    //         }
-    //     }
-    // }
-    // else if (inst->isLoad() && inst->staticInst->getDataSize() != 8)
-    // {
-    //     // this is defenitly not a pointer refill
-    //     // set the dest regs as PID(0)
-    //     TheISA::PointerID _pid = TheISA::PointerID(0);
-    //     for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-    //         if (inst->staticInst->destRegIdx(i).isIntReg() &&
-    //            (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-    //         {
-    //             int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-    //             dependGraph[dest_reg_idx].push_front(
-    //                                           PointerDepEntry(inst, _pid));
-    //             FetchArchRegsPid[dest_reg_idx] = _pid;
-    //         }
-    //     }
-    // }
+    else if (inst->staticInst->getName() == "st") {TransferStoreMicroops(inst);}
+    else if (inst->staticInst->getName() == "ld") {TransferLoadMicroops(inst);}
     else {
 
         TheISA::PointerID _pid{0} ;
@@ -186,6 +154,7 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
 
     DPRINTF(TypeTracker, "Dependency Graph After Insert:\n");
     dump();
+    dump(inst);
 
 }
 
@@ -273,10 +242,10 @@ void
 PointerDependencyGraph<Impl>::dump(DynInstPtr &inst)
 {
 
-    DPRINTF(TypeTracker, "---------------------------------------------------------------------\n");
+    
     for (size_t i = 0; i < TheISA::NumIntRegs; i++)
     {
-        if (FetchArchRegsPid[i] != TheISA::PointerID(0) && CommitArchRegsPid[i] != TheISA::PointerID(0))
+        if (FetchArchRegsPid[i] != TheISA::PointerID(0) || CommitArchRegsPid[i] != TheISA::PointerID(0))
             DPRINTF(TypeTracker, "FetchArchRegsPid[%s]\t=\t[%d]\t\tCommitArchRegsPid[%s]\t=\t[%d]\n", 
                     TheISA::IntRegIndexStr(i), FetchArchRegsPid[i], TheISA::IntRegIndexStr(i), CommitArchRegsPid[i]);
     }
@@ -290,7 +259,7 @@ template <class Impl>
 void
 PointerDependencyGraph<Impl>::dump()
 {
-    DPRINTF(TypeTracker, "---------------------------------------------------------------------\n");
+    
     for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
 
         for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); it++)
@@ -301,7 +270,7 @@ PointerDependencyGraph<Impl>::dump()
                                 it->inst->seqNum,
                                 it->inst->pcState(), 
                                 it->inst->staticInst->disassemble(it->inst->pcState().instAddr()),
-                                it->pid);
+                                it->inst->dyn_pid);
      
         }
     }
@@ -544,22 +513,195 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst)
                 TheISA::IntRegIndexStr(src1), 
                 FetchArchRegsPid[src1].getPID());
 
-            if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && FetchArchRegsPid[src0] != TheISA::PointerID(0))
+            if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && FetchArchRegsPid[src1] != TheISA::PointerID(0))
             {
                 assert(false && "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
             }
 
-            TheISA::PointerID _pid = FetchArchRegsPid[src0];
+            TheISA::PointerID _pid = FetchArchRegsPid[src1];
 
             FetchArchRegsPid[dest] = _pid;
 
             dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+
+            inst->dyn_pid = _pid;
             
     }
     else 
     {
         assert(false && "Found a mov inst that is not Mov or MovFlags!\n");
     }
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst)
+{
+
+    assert(inst->numDestRegs() == 0 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISAInst::St * inst_st = dynamic_cast<X86ISAInst::St*>(inst->staticInst.get()); 
+    assert(inst_st != nullptr && "Found a st inst that is not X86ISA::St!\n");
+ 
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+    uint16_t src2 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //data
+    assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+    assert(src2 < TheISA::NumIntRegs);
+
+
+
+    DPRINTF(TypeTracker, "\t\tMEM[Base(%s), Index(%s)] <=== FetchArchRegsPid[%s]=[%d]\n", 
+                TheISA::IntRegIndexStr(src1),
+                TheISA::IntRegIndexStr(src0),
+                TheISA::IntRegIndexStr(src2), 
+                FetchArchRegsPid[src2].getPID());
+
+    panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && (FetchArchRegsPid[src2] != TheISA::PointerID(0)),
+                        "TransferStoreMicroops :: Found a 1/2/4 bytes St Inst with data reg non-zero PID!\n");
+
+    panic_if (!(inst->staticInst->getSegment() == TheISA::SEGMENT_REG_DS || inst->staticInst->getSegment() == TheISA::SEGMENT_REG_SS) 
+                      && (FetchArchRegsPid[src2] != TheISA::PointerID(0)), 
+                      "TransferStoreMicroops :: Found a St Inst with SS || DS segment reg that data reg is not PID(0)!\n");
+
+    panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+                    "TransferStoreMicroops :: Found a St Microop with non-zero PID Index!\n");
+        
+            
+
+    TheISA::PointerID _pid = FetchArchRegsPid[src2];
+
+    inst->dyn_pid = _pid;
+            
+    
+ 
+
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
+{
+
+    assert(inst->numDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+
+
+    // This is 1/2 bytes Load Microop -- This should never be pointer refill!
+    if (dataSize == 2 || dataSize == 1)
+    {
+        X86ISAInst::Ld * inst_ld = dynamic_cast<X86ISAInst::Ld*>(inst->staticInst.get()); 
+        assert(inst_ld != nullptr && "Found a 1/2 bytes ld inst that is not X86ISA::Ld!\n");
+        //set the destnation register to PID(0)
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //dest
+        assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+        assert(dest < TheISA::NumIntRegs);
+
+
+
+        
+        panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 1/2 Ld Microop with non-zero PID Index!\n");
+            
+                
+
+        FetchArchRegsPid[dest] = TheISA::PointerID(0);
+
+        inst->dyn_pid = TheISA::PointerID(0);
+
+        dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+
+        DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].getPID());
+
+        
+    }
+
+    else if ( dataSize == 4)
+    {
+        X86ISAInst::LdBig * inst_ldbig = dynamic_cast<X86ISAInst::LdBig*>(inst->staticInst.get()); 
+        assert((inst_ldbig != nullptr) && "Found a 4 bytes ld inst that is not X86ISA::LdBig!\n");
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+        assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+        assert(dest < TheISA::NumIntRegs);
+
+
+
+        
+        panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 4 Ld Microop with non-zero PID Index!\n");
+            
+                
+
+        FetchArchRegsPid[dest] = TheISA::PointerID(0);
+
+        inst->dyn_pid = TheISA::PointerID(0);
+
+        dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+
+        DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].getPID());
+
+
+    }
+    else 
+    {
+        X86ISAInst::LdBig * inst_ldbig = dynamic_cast<X86ISAInst::LdBig*>(inst->staticInst.get()); 
+        assert((inst_ldbig != nullptr) && "Found a 8 bytes ld inst that is not X86ISA::LdBig!\n");
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+        assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+        assert(dest < TheISA::NumIntRegs);
+
+
+
+        
+        panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 4 Ld Microop with non-zero PID Index!\n");
+            
+                
+        TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+        FetchArchRegsPid[dest] = _pid;
+
+        inst->dyn_pid = _pid;
+
+        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+
+        DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].getPID());
+
+    }
+
 }
 
 #endif // __CPU_O3_DEP_GRAPH_HH__

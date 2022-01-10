@@ -319,6 +319,7 @@ class DefaultCommit
 
     void updatePointerTracker(ThreadID tid, DynInstPtr &head_inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &head_inst);
+    void CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &head_inst);
     void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
     void collector(ThreadID tid, DynInstPtr &inst);
     /** Gets the thread to commit, based on the SMT policy. */

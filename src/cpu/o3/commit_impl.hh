@@ -69,6 +69,7 @@
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
 #include "debug/Capability.hh"
+#include "debug/TypeTracker.hh"
 
 using namespace std;
 
@@ -1314,7 +1315,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     if (tc->enableCapability){
 
       if (head_inst->isStore()){
-        updateAliasTable(tid, head_inst);
+        CommitUpdateAliasTableInCommit(tid, head_inst);
       }
 
       cpu->ExeAliasCache->RemoveStackAliases(
@@ -1743,12 +1744,51 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
 }
 
+template <class Impl>
+void
+DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &head_inst)
+{
+
+  ThreadContext * tc = cpu->tcBase(tid); 
+  assert(head_inst->isStore());
+  assert(tc->enableCapability);
+  assert (!head_inst->isMicroopInjected()) ;
+  assert (!head_inst->isBoundsCheckMicroop()) ;
+
+
+  const StaticInstPtr si = head_inst->staticInst;
+  
+  if (si->getName() != "st") return;
+  // datasize should be 8 bytes othersiwe it's not a base address
+  if (si->getDataSize() != 8) return; // only for 64 bits system
+       // return if store is not pointed to the DS or SS section
+  if (!( si->getSegment() == TheISA::SEGMENT_REG_DS ||
+            si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+
+  // srcReg[2] in store microops is the register that
+  //we want to write its value to mem
+  uint64_t  dataRegContent =
+                    head_inst->readIntRegOperand(head_inst->staticInst.get(),2); // src(2) is the data register
+
+  DPRINTF(TypeTracker, "IEWUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", head_inst->seqNum, head_inst->effAddr, head_inst->dyn_pid, dataRegContent);
+  cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
+
+  Process *p = tc->getProcessPtr();
+  Addr vpn = p->pTable->pageAlign(head_inst->effAddr);
+  if (!cpu->dtb->lookupAndUpdateEntry(vpn, true)){
+    warn("No Entry found for commited store!\n");
+  }
+
+
+}
+
 // In this fucntion if
 template <class Impl>
 void
 DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
 {
-
+  
+  assert(0);
   #define ENABLE_COMMIT_ALIAS_TABLE_DEBUG 0
 
   ThreadContext * tc = cpu->tcBase(tid);

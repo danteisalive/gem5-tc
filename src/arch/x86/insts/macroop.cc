@@ -43,6 +43,7 @@ bool MacroopBase::filterInst(ThreadContext * tc, TheISA::PCState &nextPC) {
 
 void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 {
+        assert(0);
       #define ENABLE_POINTER_TRACKER_DEBUG 0
       // this is probably a a little late but still can be effective
       if (!filterInst(tc,nextPC)) return;

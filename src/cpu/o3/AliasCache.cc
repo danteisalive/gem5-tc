@@ -29,6 +29,7 @@
  */
 
 #include "cpu/o3/AliasCache.hh"
+#include "debug/TypeTracker.hh"
 
 namespace X86ISA
 {
@@ -565,12 +566,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
     bool LRUAliasCache::InsertStoreQueue(uint64_t seqNum, Addr effAddr,
                                          PointerID& pid)
     {
-      if (ENABLE_ALIAS_CACHE_DEBUG){
-         std::cout << "InsertStoreQueue: " << "SeqNum: " <<
-                      std::dec << seqNum << " " <<
-                      std::hex << "EffAddr: " << effAddr << " " <<
-                      pid << std::endl;
-      }
+      DPRINTF(TypeTracker, "Alias Cache InsertStoreQueue:: SeqNum: %d EffAddr: 0x%x\n", seqNum, effAddr);
+      
       ExeAliasTableBuffer[AliasTableKey(seqNum,effAddr)] = pid;
 
       return true;
@@ -588,25 +585,22 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
          if (include_inst &&
             (exe_alias_buffer->first.first >= squashed_num))
          {
-           if (ENABLE_ALIAS_CACHE_DEBUG){
-              std::cout << "Squash: " << "SeqNum: " << std::dec <<
-                           exe_alias_buffer->first.first << " " <<
-                           std::hex << "EffAddr: " <<
-                           exe_alias_buffer->first.second << " " <<
-                           exe_alias_buffer->second << std::endl;
-           }
+           DPRINTF(TypeTracker, "Alias Cache Squash (Include Inst):: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                  exe_alias_buffer->first.first, 
+                  exe_alias_buffer->first.second,
+                  exe_alias_buffer->second
+                  );
+          
            ExeAliasTableBuffer.erase(exe_alias_buffer);
          }
          else if (!include_inst &&
                  (exe_alias_buffer->first.first > squashed_num))
          {
-           if (ENABLE_ALIAS_CACHE_DEBUG){
-              std::cout << "Squash: " << "SeqNum: " << std::dec <<
-                           exe_alias_buffer->first.first << " " <<
-                           std::hex << "EffAddr: " <<
-                           exe_alias_buffer->first.second << " " <<
-                           exe_alias_buffer->second << std::endl;
-           }
+           DPRINTF(TypeTracker, "Alias Cache Squash !(Include Inst):: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                  exe_alias_buffer->first.first, 
+                  exe_alias_buffer->first.second,
+                  exe_alias_buffer->second
+                  );
            ExeAliasTableBuffer.erase(exe_alias_buffer);
          }
       }
@@ -624,14 +618,12 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                       ++exe_alias_buffer)
       {
           if (exe_alias_buffer->first.second == effAddr){
-            if (ENABLE_ALIAS_CACHE_DEBUG){
-               std::cout << "AccessStoreQueue: " <<
-                            "SeqNum: " << std::dec <<
-                            exe_alias_buffer->first.first << " " <<
-                            std::hex << "EffAddr: " <<
-                            exe_alias_buffer->first.second << " " <<
-                            exe_alias_buffer->second << std::endl;
-            }
+            DPRINTF(TypeTracker, "Alias Cache AccessStoreQueue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                  exe_alias_buffer->first.first, 
+                  exe_alias_buffer->first.second,
+                  exe_alias_buffer->second
+                  );
+        
             *pid = exe_alias_buffer->second;
             return true;  // found in SQ
           }
@@ -651,16 +643,15 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
          ++next_it;
          if (exe_alias_table->first.first == squashed_num)
          {
-           if (ENABLE_ALIAS_CACHE_DEBUG){
-              std::cout << "SquashEntry: " << "SeqNum: " << std::dec <<
-                           exe_alias_table->first.first << " " <<
-                           std::hex << "EffAddr: " <<
-                           exe_alias_table->first.second << " " <<
-                           exe_alias_table->second << std::endl;
-           }
-           //remove and break we cant have two equal seqNum
-           ExeAliasTableBuffer.erase(exe_alias_table);
-           return true;
+            DPRINTF(TypeTracker, "Alias Cache SquashEntry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                  exe_alias_table->first.first, 
+                  exe_alias_table->first.second,
+                  exe_alias_table->second
+                  );
+           
+            //remove and break we cant have two equal seqNum
+            ExeAliasTableBuffer.erase(exe_alias_table);
+            return true;
          }
       }
 
@@ -677,10 +668,11 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
     void LRUAliasCache::dump (){
       //dump for debugging
       for (auto& entry : ExeAliasTableBuffer) {
-          std::cout << std::dec << "SeqNum: " << entry.first.first << " " <<
-                    std::hex << "EffAddr: " <<
-                    entry.first.second << " " << std::dec <<
-                    entry.second << std::endl;
+        DPRINTF(TypeTracker, "Alias Cache SquashEntry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                  entry.first.first, 
+                  entry.first.second,
+                  entry.second
+                  );
       }
 
     }

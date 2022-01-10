@@ -62,7 +62,7 @@
 #include "debug/O3PipeView.hh"
 #include "params/DerivO3CPU.hh"
 #include "debug/Capability.hh"
-
+#include "debug/TypeTracker.hh"
 using namespace std;
 
 template<class Impl>
@@ -1684,7 +1684,7 @@ DefaultIEW<Impl>::writebackInsts()
               // only stores can update ExeAliasTable
               if (inst->isStore())
               {
-                updateAliasTable(inst->threadNumber, inst);
+                IEWUpdateAliasTableUsingPointerTracker(inst->threadNumber, inst);
               }
 
               if (inst->isBoundsCheckMicroop()){
@@ -1992,13 +1992,43 @@ DefaultIEW<Impl>::squashExecuteAliasTable(DynInstPtr &inst, bool include_inst)
 
 }
 
+template <class Impl>
+void
+DefaultIEW<Impl>::IEWUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPtr &inst)
+{
+  
+  ThreadContext * tc = cpu->tcBase(tid); 
+  assert(inst->isStore());
+  assert(tc->enableCapability);
+  assert (!inst->isMicroopInjected()) ;
+  assert (!inst->isBoundsCheckMicroop()) ;
 
+
+  const StaticInstPtr si = inst->staticInst;
+  
+  if (si->getName() != "st") return;
+  // datasize should be 8 bytes othersiwe it's not a base address
+  if (si->getDataSize() != 8) return; // only for 64 bits system
+       // return if store is not pointed to the DS or SS section
+  if (!( si->getSegment() == TheISA::SEGMENT_REG_DS ||
+            si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+
+  // srcReg[2] in store microops is the register that
+  //we want to write its value to mem
+  uint64_t  dataRegContent =
+                    inst->readIntRegOperand(inst->staticInst.get(),2); // src(2) is the data register
+
+  DPRINTF(TypeTracker, "IEWUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", inst->seqNum, inst->effAddr, inst->dyn_pid, dataRegContent);
+  cpu->ExeAliasCache->InsertStoreQueue(inst->seqNum, inst->effAddr, inst->dyn_pid);
+
+}
 
 template <class Impl>
 void
 DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
 {
-  #define ENABLE_EXE_ALIAS_TABLE_DEBUG 0
+   assert(0);
+   assert(inst->isStore());
 
   //ThreadContext * tc = cpu->tcBase(tid);
   const StaticInstPtr si = inst->staticInst;
