@@ -1486,7 +1486,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                     if (staticInst->isMacroop() && tc->enableCapability){
                         DPRINTF(Fetch, "Num Micro-ops before injection: %d\n", staticInst->getNumOfMicroops());
                         int oldMicroOps =  staticInst->getNumOfMicroops();
-                        //lookupAndUpdateLVPT(thisPC, tid, staticInst);
+                        lookupAndUpdateLVPT(thisPC, tid, staticInst);
                         capabilityCheck(thisPC, tid, staticInst);
                         int newMicroOps =  staticInst->getNumOfMicroops();
                         DPRINTF(Fetch, "Num Micro-ops after injection: %d\n", staticInst->getNumOfMicroops());

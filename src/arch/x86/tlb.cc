@@ -56,6 +56,7 @@
 #include "mem/request.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
+#include "debug/TypeTracker.hh"
 
 namespace X86ISA {
 
@@ -152,13 +153,15 @@ TLB::lookupAndUpdateEntry(Addr vpn, bool hasAlias)
   TlbEntry *Entry = trie.lookup(vpn);
 
   if (Entry)
-    {
+  {
+      DPRINTF(TypeTracker, "Updating TLB entry for VPN=0x%x with hasAlias=%d\n", vpn, hasAlias);
       Entry->valid = true;
       Entry->hasAlias = hasAlias;
       return true;
-    }
+  }
   else
   {
+    DPRINTF(TypeTracker, "Cannot find any entry for VPN=0x%x with hasAlias=%d\n", vpn, hasAlias);  
     return false;
   }
 }
@@ -420,6 +423,8 @@ TLB::translate(const RequestPtr &req,
 
                         if (tc->enableCapability)
                         {
+                            DPRINTF(TypeTracker, "Handling a TLB Miss! Mapping %#x to %#x\n", alignedVaddr,
+                                pte->paddr);
                             auto it = tc->ShadowMemory.find(alignedVaddr);
                             if (it != tc->ShadowMemory.end() &&
                                 it->second.size() != 0)
@@ -440,17 +445,6 @@ TLB::translate(const RequestPtr &req,
                     "doing protection checks.\n", entry->paddr);
             // Do paging protection checks.
 
-            // auto mtt_it = tc->MemTrackTable.find(vaddr);
-            // if (mtt_it != tc->MemTrackTable.end()){
-            //   entry->pids[(mtt_it->second)] = 1;
-            //   if (entry->pids.size() > 0)
-            //   std::cout << std::hex << "Page[" << entry->vaddr <<"] = " <<
-            //             std::dec << entry->pids.size() << std::hex <<
-            //             std::endl;
-            //   for (auto& elem : entry->pids)
-            //       std::cout << std::dec << elem.first << ", " ;
-            //   std::cout << std::endl;
-            // }
 
             bool inUser = (m5Reg.cpl == 3 &&
                     !(flags & (CPL0FlagBit << FlagShift)));

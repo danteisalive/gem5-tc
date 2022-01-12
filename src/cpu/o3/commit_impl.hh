@@ -1770,7 +1770,7 @@ DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &he
   uint64_t  dataRegContent =
                     head_inst->readIntRegOperand(head_inst->staticInst.get(),2); // src(2) is the data register
 
-  DPRINTF(TypeTracker, "IEWUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", head_inst->seqNum, head_inst->effAddr, head_inst->dyn_pid, dataRegContent);
+  DPRINTF(TypeTracker, "CommitUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", head_inst->seqNum, head_inst->effAddr, head_inst->dyn_pid, dataRegContent);
   cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
 
   Process *p = tc->getProcessPtr();

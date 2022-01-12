@@ -52,6 +52,7 @@
 #include "debug/Capability.hh"
 #include "mem/page_table.hh"
 #include "sim/process.hh"
+#include "debug/TypeTracker.hh"
 
 namespace X86ISA
 {
@@ -109,11 +110,15 @@ class LRUVictimCache
         }
 
         if (hit){
+          DPRINTF(TypeTracker, "VictimCacheWriteBack :: Found the entry for EffAddr: 0x%x, bringing it to the top of the Store Queue!\n", 
+                    vaddr);
           VictimCache.push_front(vaddr);
           return;
         }
 
         // by here we dont have any entry with the same address
+        DPRINTF(TypeTracker, "VictimCacheWriteBack :: Didn't Find the entry for EffAddr: 0x%x, pushing it to the top of the Store Queue!\n", 
+                    vaddr);
         if (VictimCache.size() <= NumOfEntrys){
           VictimCache.push_front(vaddr);
         }
@@ -176,6 +181,7 @@ class LRUAliasCache
 
         bool Commit(Addr vaddr, ThreadContext* tc, PointerID& pid);
         bool CommitStore(Addr vaddr,uint64_t storeSeqNum, ThreadContext* tc);
+        bool CommitToShadowMemory(Addr vaddr,ThreadContext* tc, PointerID& pid);
         bool Invalidate(ThreadContext* tc, PointerID& pid);
 
         bool RemoveStackAliases(Addr vaddr, ThreadContext* tc);

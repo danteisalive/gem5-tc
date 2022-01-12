@@ -69,6 +69,7 @@
 #include "mem/request.hh"
 #include "sim/byteswap.hh"
 #include "sim/system.hh"
+#include "debug/TypeTracker.hh"
 
 /**
  * @file
@@ -1086,6 +1087,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
 
   ThreadContext * tc =  cpu->tcBase(threadNumber);
 
+  DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Checking for a potential alias for addr=0x%x\n", vaddr);
 
   // this is a lazy workaround TODO:make it real!
   Process *p = tc->getProcessPtr();
@@ -1098,16 +1100,19 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
     if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc)){
       // if this is miss return and wait
       // otherwise continue executing the load
+      DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Alias found in shadow memory for VAddr=0x%x but it's a miss in alias cache! Waiting!\n", vaddr);
       instFlags[AliasFetchComplete] = false;
       return true;
     }
     else {
+    DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Alias found in shadow memory for VAddr=0x%x and it's a hit in alias cache! Servicing!\n", vaddr);
       // hit and threrefore no need to wait
       instFlags[AliasFetchComplete] = true;
       return false;
     }
   }
   else{
+    DPRINTF(TypeTracker, "isAliasCacheMissed::No Alias Found For VAddr=0x%x\n", vaddr);
     // there is no alias for this load
     cpu->ExeAliasCache->total_accesses++;
     cpu->ExeAliasCache->total_hits++;

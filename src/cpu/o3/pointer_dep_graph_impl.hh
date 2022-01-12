@@ -46,6 +46,7 @@
 #include "cpu/o3/comm.hh"
 #include "debug/TypeTracker.hh"
 #include "cpu/o3/pointer_dep_graph.hh"
+#include "debug/PointerDepGraph.hh"
 
 
 template <class Impl>
@@ -73,12 +74,12 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
     if (inst->isBoundsCheckMicroop()) return;
 
 
-    DPRINTF(TypeTracker, "Tracking Alias for Instruction: [%d][%s][%s]\n", 
+    DPRINTF(PointerDepGraph, "Tracking Alias for Instruction: [%d][%s][%s]\n", 
             inst->seqNum,
             inst->pcState(), 
             inst->staticInst->disassemble(inst->pcState().instAddr()));
 
-    DPRINTF(TypeTracker, "Dependency Graph Before Insert:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph Before Insert:\n");
     dump();
 
     //transfer capabilities
@@ -91,7 +92,6 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
                                         PointerDepEntry(inst, inst->dyn_pid));
         FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
 
-        dump(inst);
     }
     else if (inst->isFreeCallMicroop() ||
             inst->isReallocSizeCollectorMicroop())
@@ -99,7 +99,7 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
         dependGraph[X86ISA::INTREG_RDI].push_front(
                                         PointerDepEntry(inst, inst->dyn_pid));
         FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
-        dump(inst);
+
     }
 
 
@@ -152,9 +152,9 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
         inst->FetchArchRegsPid[i] = FetchArchRegsPid[i];
     }
 
-    DPRINTF(TypeTracker, "Dependency Graph After Insert:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph After Insert:\n");
     dump();
-    dump(inst);
+
 
 }
 
@@ -163,8 +163,8 @@ void
 PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
 
 
-    DPRINTF(TypeTracker, "Squashing Alias Until Sequence Number: [%d]\n", squashedSeqNum);
-    DPRINTF(TypeTracker, "Dependency Graph Before Squashing:\n");
+    DPRINTF(PointerDepGraph, "Squashing Alias Until Sequence Number: [%d]\n", squashedSeqNum);
+    DPRINTF(PointerDepGraph, "Dependency Graph Before Squashing:\n");
     dump();
 
     // if the producer seqNum is greater than squashedSeqNum then
@@ -196,7 +196,7 @@ PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
         }
     }
 
-    DPRINTF(TypeTracker, "Dependency Graph After Squashing:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph After Squashing:\n");
     dump();
 }
 
@@ -207,11 +207,11 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
     if (inst->isBoundsCheckMicroop()) return; // we do not save these
 
 
-    DPRINTF(TypeTracker, "Commiting Alias for Instruction: [%d][%s][%s]\n", 
+    DPRINTF(PointerDepGraph, "Commiting Alias for Instruction: [%d][%s][%s]\n", 
             inst->seqNum,
             inst->pcState(), 
             inst->staticInst->disassemble(inst->pcState().instAddr()));
-    DPRINTF(TypeTracker, "Dependency Graph Before Commiting:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph Before Commiting:\n");
     dump();
 
     // for all the dest regs for this inst, commit it
@@ -233,7 +233,7 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
       }
     }
 
-    DPRINTF(TypeTracker, "Dependency Graph After Commiting:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph After Commiting:\n");
     dump();
 }
 
@@ -246,12 +246,12 @@ PointerDependencyGraph<Impl>::dump(DynInstPtr &inst)
     for (size_t i = 0; i < TheISA::NumIntRegs; i++)
     {
         if (FetchArchRegsPid[i] != TheISA::PointerID(0) || CommitArchRegsPid[i] != TheISA::PointerID(0))
-            DPRINTF(TypeTracker, "FetchArchRegsPid[%s]\t=\t[%d]\t\tCommitArchRegsPid[%s]\t=\t[%d]\n", 
+            DPRINTF(PointerDepGraph, "FetchArchRegsPid[%s]\t=\t[%d]\t\tCommitArchRegsPid[%s]\t=\t[%d]\n", 
                     TheISA::IntRegIndexStr(i), FetchArchRegsPid[i], TheISA::IntRegIndexStr(i), CommitArchRegsPid[i]);
     }
     
 
-    DPRINTF(TypeTracker, "---------------------------------------------------------------------\n");
+    DPRINTF(PointerDepGraph, "---------------------------------------------------------------------\n");
 
 }
 
@@ -265,7 +265,7 @@ PointerDependencyGraph<Impl>::dump()
         for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); it++)
         {
           assert(it->inst); // shouldnt be a null inst
-          DPRINTF(TypeTracker, "[%s] ==> [%d][%s][%s] %d\n", 
+          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s] %d\n", 
                                 TheISA::IntRegIndexStr(i),
                                 it->inst->seqNum,
                                 it->inst->pcState(), 
@@ -274,7 +274,14 @@ PointerDependencyGraph<Impl>::dump()
      
         }
     }
-    DPRINTF(TypeTracker, "---------------------------------------------------------------------\n");
+
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++)
+    {
+        if (FetchArchRegsPid[i] != TheISA::PointerID(0) || CommitArchRegsPid[i] != TheISA::PointerID(0))
+            DPRINTF(PointerDepGraph, "FetchArchRegsPid[%s]\t=\t[%d]\t\tCommitArchRegsPid[%s]\t=\t[%d]\n", 
+                    TheISA::IntRegIndexStr(i), FetchArchRegsPid[i], TheISA::IntRegIndexStr(i), CommitArchRegsPid[i]);
+    }
+    DPRINTF(PointerDepGraph, "---------------------------------------------------------------------\n");
 
 }
 
@@ -289,11 +296,11 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
         panic("doUpdate called with a non-load instruction!");
     }
 
-    DPRINTF(TypeTracker, "IEW Updating Alias for Instruction: [%d][%s][%s]\n", 
+    DPRINTF(PointerDepGraph, "IEW Updating Alias for Instruction: [%d][%s][%s]\n", 
             inst->seqNum,
             inst->pcState(), 
             inst->staticInst->disassemble(inst->pcState().instAddr()));
-    DPRINTF(TypeTracker, "Dependency Graph Before IEW Updating:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph Before IEW Updating:\n");
     dump();
 
 
@@ -364,7 +371,7 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     //}
 
 
-    DPRINTF(TypeTracker, "Dependency Graph After IEW Updating:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph After IEW Updating:\n");
     dump();
 
 
@@ -508,7 +515,7 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst)
 
 
 
-            DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[%s] <=== FetchArchRegsPid[%s]=[%d]\n", 
+            DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== FetchArchRegsPid[%s]=[%d]\n", 
                 TheISA::IntRegIndexStr(dest),
                 TheISA::IntRegIndexStr(src1), 
                 FetchArchRegsPid[src1].getPID());
@@ -558,7 +565,7 @@ PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst)
 
 
 
-    DPRINTF(TypeTracker, "\t\tMEM[Base(%s), Index(%s)] <=== FetchArchRegsPid[%s]=[%d]\n", 
+    DPRINTF(PointerDepGraph, "\t\tMEM[Base(%s), Index(%s)] <=== FetchArchRegsPid[%s]=[%d]\n", 
                 TheISA::IntRegIndexStr(src1),
                 TheISA::IntRegIndexStr(src0),
                 TheISA::IntRegIndexStr(src2), 
@@ -626,7 +633,7 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
 
         dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
 
-        DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+        DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
                     FetchArchRegsPid[dest].getPID());
@@ -661,7 +668,7 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
 
         dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
 
-        DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+        DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
                     FetchArchRegsPid[dest].getPID());
@@ -695,7 +702,7 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
 
         dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
 
-        DPRINTF(TypeTracker, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+        DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
                     FetchArchRegsPid[dest].getPID());

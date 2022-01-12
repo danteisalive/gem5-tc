@@ -777,6 +777,7 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
 
         //check PID for this load here
         if (tc->enableCapability && mispredictedPID(tid, inst)){
+            DPRINTF(TypeTracker, "LSQUnit<Impl>::executeLoad::Found a Mispreditced Alias! SeqNum=%d\n",inst->seqNum);
             loadWithWrongPID = inst;
         }
 
@@ -1167,6 +1168,8 @@ LSQUnit<Impl>::squash(MisspredictionType _MissPIDSquashType,
     }
 
     if (loadWithWrongPID && squashed_num < loadWithWrongPID->seqNum) {
+        DPRINTF(TypeTracker, "LSQUnit<Impl>::executeLoad::Nulifying Mispredicted Alias due to a another squash for inst with SeqNum=%d!\n",
+                squashed_num);    
         loadWithWrongPID = NULL;
     }
 
@@ -1482,7 +1485,7 @@ bool
 LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 {
 
-    #define ENABLE_PREDICTOR_DEBUG 0
+   // #define ENABLE_PREDICTOR_DEBUG 0
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
@@ -1495,11 +1498,12 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
    assert(inst->isLoad());
 
-   if (!inst->destRegIdx(0).isIntReg()) return false;
+   //if (!inst->destRegIdx(0).isIntReg()) return false;
+   if (si->getName() != "ld") return false;
 
-   int  dest = si->getMemOpDataRegIndex();
-   if (dest > X86ISA::NUM_INTREGS + 15)
-      return false;
+//    int  dest = si->getMemOpDataRegIndex();
+//    if (dest > X86ISA::NUM_INTREGS + 15)
+//       return false;
 
 
     cpu->NumOfAliasTableAccess++;
@@ -1512,14 +1516,12 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
     {
 
             inst->staticInst->isSquashedAfterInjection = true;
-            if (ENABLE_PREDICTOR_DEBUG){
-               std::cout << std::hex <<
-                          "EXECUTE: False Prediction Load Instruction: " <<
-                          inst->pcState().instAddr() << " " <<
-                          std::dec  <<inst->seqNum<< " " <<
-                          "Predicted: " << inst->macroop->getMacroopPid() <<
-                          " " << "Actual: " << pid << std::endl;
-            }
+
+            DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction: PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid(),
+                    pid);
 
             cpu->FalsePredict++;
             cpu->LVPTMissPredict++;
@@ -1585,14 +1587,12 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
       else
       {
 
-            if (ENABLE_PREDICTOR_DEBUG){
-                std::cout << std::hex <<
-                          "EXECUTE: True Prediction Load Instruction: " <<
-                          inst->pcState().instAddr() << " " <<
-                          std::dec  <<inst->seqNum<< " " <<
-                          "Predicted: " << inst->macroop->getMacroopPid() <<
-                          " " << "Actual: " << pid << std::endl;
-            }
+            DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: True Prediction Load Instruction: PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid(),
+                    pid);
+                    
             cpu->updateFetchLVPT(inst, pid, pid, true);
             inst->MissPIDSquashType = MisspredictionType::NONE;
             return false;

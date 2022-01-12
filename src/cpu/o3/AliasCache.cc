@@ -122,11 +122,17 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                     }
                     AliasCache[thisIsTheSet][wayNum].lruAge = 0;
 
+                    DPRINTF(TypeTracker, "LRUAliasCache::Access::Found an alias in Alias Cache :: EffAddr: 0x%x PID=%s\n", 
+                        AliasCache[thisIsTheSet][wayNum].vaddr, 
+                        AliasCache[thisIsTheSet][wayNum].pid
+                    );
                     return true;
 
                 }
 
             }
+            DPRINTF(TypeTracker, "LRUAliasCache::Access::Miss in Alias Cache :: Trying to find a new replacement for EffAddr: 0x%x\n", 
+                    vaddr);
             // if we are here then it means a miss
             // find the candiate for replamcement
             size_t candidateWay = 0;
@@ -143,6 +149,10 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                   candidateWay = i;
                 }
             }
+
+            DPRINTF(TypeTracker, "LRUAliasCache::Access::Candidiate way for replacement: EffAddr: 0x%x Candidate Way=%d\n", 
+                    vaddr,
+                    candidateWay);
 
             for (size_t i = 0; i < NumWays; i++) {
               AliasCache[thisIsTheSet][i].lruAge++;
@@ -174,6 +184,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 {
 
                     //send the wb_addr to WbBuffer;
+
                     uint64_t wb_addr =
                                 AliasCache[thisIsTheSet][candidateWay].vaddr;
                     WriteBack(wb_addr);
@@ -182,9 +193,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                     // in this case writeback
                     PointerID wb_pid =
                                     AliasCache[thisIsTheSet][candidateWay].pid;
-
-                    if (AliasCache[thisIsTheSet][candidateWay].pid.getPID()
-                                                                        != 0){
+                    DPRINTF(TypeTracker, "LRUAliasCache::Access::WriteBack for EffAddr: 0x%x in Shadow Memory! wb_pid=%s\n", 
+                            vaddr,wb_pid);
+                    if (AliasCache[thisIsTheSet][candidateWay].pid != TheISA::PointerID(0)){
                         tc->ShadowMemory[wb_vpn][wb_addr] = wb_pid;
                     }
                     else {
@@ -207,8 +218,14 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 if (it_lv2 != it_lv1->second.end()){
                   AliasCache[thisIsTheSet][candidateWay].pid = it_lv2->second;
                   *pid = it_lv2->second;
+                  DPRINTF(TypeTracker, "LRUAliasCache::Access::Page Found! Updating the Alias Cache for EffAddr: 0x%x pid=%s\n", 
+                            vaddr,
+                            it_lv2->second);
                 }
                 else {
+                  DPRINTF(TypeTracker, "LRUAliasCache::Access::No Page Found! Updating the Alias Cache for EffAddr: 0x%x pid=%s\n", 
+                            vaddr,
+                            PointerID(0));
                   AliasCache[thisIsTheSet][candidateWay].pid = PointerID(0);
                   *pid = PointerID(0);
                 }
@@ -219,9 +236,12 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 AliasCache[thisIsTheSet][candidateWay].tag = thisIsTheTag;
                 AliasCache[thisIsTheSet][candidateWay].lruAge = 0;
                 AliasCache[thisIsTheSet][candidateWay].vaddr = vaddr;
+
             }
             else {
             // there is no alias in this page threfore just send back PID(0)
+              DPRINTF(TypeTracker, "LRUAliasCache::Access::Cannot find an alias for EffAddr: 0x%x in Shadow Memory!\n", 
+                    vaddr);
                 *pid = PointerID(0);
             }
 
@@ -311,17 +331,20 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 Addr vaddr_vpn = p->pTable->pageAlign(vaddr);
                 auto sm_it = tc->ShadowMemory.find(vaddr_vpn);
 
-                if (writeback_pid != TheISA::PointerID(0) &&
+                bool commited = false;
+                if (writeback_pid != TheISA::PointerID(0) ||
                     sm_it != tc->ShadowMemory.end())
                 {
-                  Commit(it->first.second, tc, writeback_pid);
+                  commited = Commit(it->first.second, tc, writeback_pid);
                 }
                 //delete from alias store buffer
                 ExeAliasTableBuffer.erase(it);
+                DPRINTF(TypeTracker, "LRUAliasCache::CommitStore::%s Alias with VAddr=0x%x PID=%s to Shadow Memory!\n",
+                        commited ? "COMMITED":"DID NOT COMMIT" ,it->first.second, writeback_pid);
                 return true;
             }
             else {
-              panic("Commiting a store which cannot be found!");
+              panic("LRUAliasCache::CommitStore::Commiting a store which cannot be found!\n");
             }
       }
       return false;
@@ -360,6 +383,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 AliasCache[thisIsTheSet][wayNum].pid   = pid;
                 AliasCache[thisIsTheSet][wayNum].vaddr = vaddr;
 
+                DPRINTF(TypeTracker, "LRUAliasCache::Commit::Found an Entry with the same Tag!\n");
+
                 // increase the lru age
                 for (size_t i = 0; i < NumWays; i++) {
                   AliasCache[thisIsTheSet][i].lruAge++;
@@ -367,6 +392,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
                 AliasCache[thisIsTheSet][wayNum].lruAge = 0;
 
+                CommitToShadowMemory(vaddr, tc, pid);
                 return true;
 
             }
@@ -374,6 +400,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         }
         // if we are here then it means a miss
         // find the candiate for replamcement
+        DPRINTF(TypeTracker, "LRUAliasCache::Commit::Cannot Find an Entry with the same Tag! Trying to replace!\n");
+
         size_t candidateWay = 0;
         size_t candiateLruAge = 0;
         for (int i = 0; i < NumWays; i++) {
@@ -390,6 +418,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         for (size_t i = 0; i < NumWays; i++) {
           AliasCache[thisIsTheSet][i].lruAge++;
         }
+        
+        DPRINTF(TypeTracker, "LRUAliasCache::Commit::Way=%d with lruAge=%d is selected for replacement!\n", candidateWay, candiateLruAge);
+
 
         // This entry is going to get evicted no matter it's dirty or not
         // just put it into the victim cache
@@ -405,32 +436,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         if (AliasCache[thisIsTheSet][candidateWay].valid &&
             AliasCache[thisIsTheSet][candidateWay].dirty)
         {
-
             uint64_t wb_addr = AliasCache[thisIsTheSet][candidateWay].vaddr;
-            WriteBack(wb_addr);
-            Process *p = tc->getProcessPtr();
-            Addr wb_vpn = p->pTable->pageAlign(wb_addr);
-            // in this case writeback
-            TheISA::PointerID wb_pid =
-                                  AliasCache[thisIsTheSet][candidateWay].pid;
-
-            if (AliasCache[thisIsTheSet][candidateWay].pid.getPID() != 0){
-                tc->ShadowMemory[wb_vpn][wb_addr] = wb_pid;
-            }
-            else {
-              // if the pid == 0 we writeback if we can find the entry in
-              // the ShadowMemory
-              auto it_lv1 = tc->ShadowMemory.find(wb_vpn);
-              if (it_lv1 != tc->ShadowMemory.end() &&
-                  it_lv1->second.size() != 0)
-              {
-                  auto it_lv2 = it_lv1->second.find(wb_addr);
-                  if (it_lv2 != it_lv1->second.end())
-                  {
-                    tc->ShadowMemory[wb_vpn][wb_addr] = wb_pid;
-                  }
-              }
-            }
+            TheISA::PointerID wb_pid = AliasCache[thisIsTheSet][candidateWay].pid;
+            CommitToShadowMemory(wb_addr, tc, wb_pid);
         }
 
         // now overwrite
@@ -441,8 +449,41 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         AliasCache[thisIsTheSet][candidateWay].vaddr = vaddr;
         AliasCache[thisIsTheSet][candidateWay].lruAge = 0;
 
-        return false;
+        // now commit it to the Shadow Memory
+        CommitToShadowMemory(vaddr, tc, pid);
 
+        return true;
+
+    }
+
+    bool LRUAliasCache::CommitToShadowMemory(Addr vaddr,ThreadContext* tc, PointerID& pid)
+    {
+        Process *p = tc->getProcessPtr();
+        Addr vpn = p->pTable->pageAlign(vaddr);
+        if (pid != TheISA::PointerID(0)){
+            DPRINTF(TypeTracker, "LRUAliasCache::CommitToShadowMemory:: Commiting an Alias for vaddr=%d to Shadow Memory! PID=%s\n", 
+                    vaddr, pid);
+            tc->ShadowMemory[vpn][vaddr] = pid;
+        }
+        else {
+            // if the pid == 0 we writeback if we can find the entry in
+            // the Shadow Memory
+            auto it_lv1 = tc->ShadowMemory.find(vpn);
+            if (it_lv1 != tc->ShadowMemory.end() && it_lv1->second.size() != 0)
+            {
+                auto it_lv2 = it_lv1->second.find(vaddr);
+                if (it_lv2 != it_lv1->second.end())
+                {
+                    DPRINTF(TypeTracker, "LRUAliasCache::CommitToShadowMemory:: Found a Previous Entry and Commiting an Alias for vaddr=%d to Shadow Memory! PID=%s\n", 
+                            vaddr, pid);
+                    tc->ShadowMemory[vpn][vaddr] = pid;
+                }
+                DPRINTF(TypeTracker, "LRUAliasCache::CommitToShadowMemory:: Cannot Find a Previous Alias Entry for vaddr=%d to Shadow Memory! PID=%s\n", 
+                            vaddr, pid);
+            }
+        }
+
+        return true;
     }
 
     bool LRUAliasCache::Invalidate( ThreadContext* tc,PointerID& pid){
@@ -453,13 +494,11 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
           if (AliasCache[setNum][wayNum].valid &&
               AliasCache[setNum][wayNum].pid == pid)
           {
-            if (ENABLE_ALIAS_CACHE_DEBUG){
-               std::cout << "Invalidate: " <<
-                            std::hex << "EffAddr: " <<
-                            AliasCache[setNum][wayNum].vaddr << " " <<
-                            AliasCache[setNum][wayNum].pid <<
-                            std::endl;
-            }
+
+            DPRINTF(TypeTracker, " Invalidate:: EffAddr: 0x%x PID=%s\n", 
+                    AliasCache[setNum][wayNum].vaddr,
+                    AliasCache[setNum][wayNum].pid
+            );
             AliasCache[setNum][wayNum].valid = false;
           }
         }
@@ -543,14 +582,12 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
               if (AliasCache[setNum][wayNum].vaddr >= next_thread_stack_base &&
                   AliasCache[setNum][wayNum].vaddr < stack_addr)
               {
-                  if (ENABLE_ALIAS_CACHE_DEBUG){
-                     std::cout << "RemoveStackAliases: " <<
-                                  std::hex << "Stack Top: " << stack_addr <<
-                                  " " << std::hex << "EffAddr: " <<
-                                  AliasCache[setNum][wayNum].vaddr << " " <<
-                                  AliasCache[setNum][wayNum].pid <<
-                                  std::endl;
-                  }
+                  DPRINTF(TypeTracker, " RemoveStackAliases:: Stack Top: 0x%x EffAddr: 0x%x PID=%s\n", 
+                    stack_addr, 
+                    AliasCache[setNum][wayNum].vaddr,
+                    AliasCache[setNum][wayNum].pid
+                  );
+
                   AliasCache[setNum][wayNum].valid = false;
               }
             }
@@ -558,6 +595,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         }
 
         RSPPrevValue = stack_addr;
+
+        dump();
 
         return true;
     }
@@ -569,6 +608,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
       DPRINTF(TypeTracker, "Alias Cache InsertStoreQueue:: SeqNum: %d EffAddr: 0x%x\n", seqNum, effAddr);
       
       ExeAliasTableBuffer[AliasTableKey(seqNum,effAddr)] = pid;
+
+      dump();
 
       return true;
 
@@ -605,6 +646,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
          }
       }
 
+      dump();
+
       return true;
     }
 
@@ -618,7 +661,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                       ++exe_alias_buffer)
       {
           if (exe_alias_buffer->first.second == effAddr){
-            DPRINTF(TypeTracker, "Alias Cache AccessStoreQueue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+            DPRINTF(TypeTracker, " AccessStoreQueue::Found an alias in Alias Cache Store Queue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
                   exe_alias_buffer->first.first, 
                   exe_alias_buffer->first.second,
                   exe_alias_buffer->second
@@ -630,6 +673,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
        }
 
+        DPRINTF(TypeTracker, " AccessStoreQueue::Cannot Find an alias in Alias Cache Store Queue for EffAddr: 0x%x\n", 
+                effAddr);
        return false; // not in SQ
     }
 
@@ -668,7 +713,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
     void LRUAliasCache::dump (){
       //dump for debugging
       for (auto& entry : ExeAliasTableBuffer) {
-        DPRINTF(TypeTracker, "Alias Cache SquashEntry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+        DPRINTF(TypeTracker, "Alias Cache:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
                   entry.first.first, 
                   entry.first.second,
                   entry.second
