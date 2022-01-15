@@ -634,10 +634,10 @@ template<class Impl>
 void
 DefaultIEW<Impl>::zeroIdiomDueToMisspredictedPID(DynInstPtr &inst,ThreadID tid)
 {
-     // first find all the dependent instructions
+    // TODO: Need more logic to actually update!
      cpu->PointerDepGraph.doUpdate(inst);
 
-     cpu->zeroIdiomMicroops(inst);
+     //cpu->zeroIdiomMicroops(inst);
 }
 
 template<class Impl>
@@ -1434,6 +1434,16 @@ DefaultIEW<Impl>::executeInsts()
                 // event adds the instruction to the queue to commit
                 fault = ldstQueue.executeLoad(inst);
 
+                if (tc->enableCapability && 
+                    !inst->isBoundsCheckMicroop() &&
+                    fault == NoFault)
+                {
+                    if (inst->isAliasFetchComplete())
+                        DPRINTF(IEW,"Alias Fetch is Complete! Instruction is not defered!\n");
+                    else 
+                        DPRINTF(IEW,"Alias Fetch is Not Complete! Instruction is defered!\n");
+                        
+                }
 
                 if (tc->enableCapability &&
                   inst->isBoundsCheckMicroop() &&
@@ -1522,11 +1532,12 @@ DefaultIEW<Impl>::executeInsts()
         // scheduler is used.  Currently the scheduler schedules the oldest
         // instruction first, so the branch resolution order will be correct.
 
-
+        
         if (!fetchRedirect[tid] ||
             !toCommit->squash[tid] ||
-            toCommit->squashedSeqNum[tid] > inst->seqNum) {
-
+            toCommit->squashedSeqNum[tid] > inst->seqNum) 
+        {
+            DPRINTF(IEW,"Trying to find misspeculations! isExecuted? %d\n", inst->isExecuted());
             // Prevent testing for misprediction on load instructions,
             // that have not been executed.
             bool loadNotExecuted = !inst->isExecuted() && inst->isLoad();
@@ -1574,21 +1585,22 @@ DefaultIEW<Impl>::executeInsts()
             } else if (tc->enableCapability &&
                        !inst->isBoundsCheckMicroop() &&
                        inst->isLoad() &&
-                       inst->isExecuted() &&
+                       //inst->isExecuted() &&
                        //inst->needAliasCacheAccess() &&
                        inst->isAliasFetchComplete() &&
-                       inst->MissPIDSquashType != MisspredictionType::NONE) {
+                       inst->MissPIDSquashType != MisspredictionType::NONE) 
+            {
+                DPRINTF(TypeTracker, "IEW:: Alias Missprediction is Found! PC Addr=0x%x SeqNum=%d Actual PID=%s\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid());
+
                 switch (inst->MissPIDSquashType) {
                   case   MisspredictionType::PNA0:
-                    //fetchRedirect[tid] = true;
-                    //squashDueToMispredictedPID(inst, tid);
                     zeroIdiomDueToMisspredictedPID(inst,tid);
                     break;
                   case   MisspredictionType::PMAN:
-                    //fetchRedirect[tid] = true;
-                    //zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
-                    cpu->PointerDepGraph.doUpdate(inst);
-                    //squashDueToMispredictedPID(inst, tid);
+                    zeroIdiomDueToMisspredictedPID(inst,tid); 
                     break;
                   case   MisspredictionType::P0AN:
                     fetchRedirect[tid] = true;
@@ -1681,25 +1693,26 @@ DefaultIEW<Impl>::writebackInsts()
 
             if (tc->enableCapability){
 
-              // only stores can update ExeAliasTable
-              if (inst->isStore())
-              {
-                IEWUpdateAliasTableUsingPointerTracker(inst->threadNumber, inst);
-              }
+                // only stores can update ExeAliasTable
+                if (inst->isStore())
+                {
+                    IEWUpdateAliasTableUsingPointerTracker(inst->threadNumber, inst);
+                }
 
-              if (inst->isBoundsCheckMicroop()){
-                  cpu->NumOfExecutedBoundsCheck++;
-              } else if (inst->isLoad() &&
-//                         inst->needAliasCacheAccess() &&
-                         !inst->isAliasFetchComplete()) {
-                  DPRINTF(IEW, "Execute: Delayed alias check, "
-                  "Deferring inst due to alias$ miss.: %s, [sn:%lli]\n",
-                  inst->pcState(), inst->seqNum);
+                if (inst->isBoundsCheckMicroop()){
+                    cpu->NumOfExecutedBoundsCheck++;
+                } 
+                else if (inst->isLoad() &&
+                          !inst->isAliasFetchComplete()) 
+                {
+                    DPRINTF(IEW, "Execute: Delayed alias check, "
+                                    "Deferring inst due to alias$ miss.: %s, [sn:%lli]\n",
+                                    inst->pcState(), inst->seqNum);
 
-                  inst->setDeferredDueToAliasCacheMiss();
-                  deferredAliasInsts.push_back(inst);
-                  continue;
-              }
+                    inst->setDeferredDueToAliasCacheMiss();
+                    deferredAliasInsts.push_back(inst);
+                    continue;
+                }
            }
         }
 
@@ -1738,76 +1751,75 @@ DefaultIEW<Impl>::tick()
 
         DPRINTF(IEW,"Issue: Processing [tid:%i]\n",tid);
 
-        for (auto it = deferredAliasInsts.begin();
-            it != deferredAliasInsts.end();
-             ++it) {
+        for (auto it = deferredAliasInsts.begin(); it != deferredAliasInsts.end(); ++it) 
+        {
             ThreadID tid = (*it)->threadNumber;
             activityThisCycle();
             if ((*it)->isAliasFetchComplete() ||
                 (*it)->isSquashed())
             {
-              if ((*it)->isAliasFetchComplete()){
-                DPRINTF(IEW, "AliasLoadFetchComplete: %s, [sn:%lli]\n",
-                  (*it)->pcState(), (*it)->seqNum);
+                if ((*it)->isAliasFetchComplete())
+                {
+                    DPRINTF(IEW, "AliasLoadFetchComplete: %s, [sn:%lli]\n",
+                            (*it)->pcState(), (*it)->seqNum);
                 }
-              else {
-                DPRINTF(IEW, "AliasLoadSquashed: %s, [sn:%lli]\n",
-                  (*it)->pcState(), (*it)->seqNum);
-              }
-              DynInstPtr inst = *it;
-              deferredAliasInsts.erase(it--);
-              if (!inst->isSquashed() &&
-                   inst->MissPIDSquashType != MisspredictionType::NONE) {
-                  if (!fetchRedirect[tid] ||
-                      !toCommit->squash[tid] ||
-                      toCommit->squashedSeqNum[tid] > inst->seqNum) {
-                    switch (inst->MissPIDSquashType) {
-                      case   MisspredictionType::PNA0:
-                        //fetchRedirect[tid] = true;
-                        //squashDueToMispredictedPID(inst, tid);
-                        zeroIdiomDueToMisspredictedPID(inst,tid);
-                        break;
-                      case   MisspredictionType::PMAN:
-                       // fetchRedirect[tid] = true;
-                        //zeroIdiomDueToMisspredictedPID(mispredictedInst,tid);
-                        cpu->PointerDepGraph.doUpdate(inst);
-                        //squashDueToMispredictedPID(inst, tid);
-                        inst->clearDeferredDueToAliasCacheMiss();
-                        inst->setCanCommit();
+                else 
+                {
+                    DPRINTF(IEW, "AliasLoadSquashed: %s, [sn:%lli]\n",
+                            (*it)->pcState(), (*it)->seqNum);
+                }
+                
+                DynInstPtr inst = *it;
+                deferredAliasInsts.erase(it--);
 
-                        DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
-                                inst->seqNum, inst->pcState());
+                if (!inst->isSquashed() &&
+                    inst->MissPIDSquashType != MisspredictionType::NONE) 
+                {
+                    if (!fetchRedirect[tid] ||
+                        !toCommit->squash[tid] ||
+                        toCommit->squashedSeqNum[tid] > inst->seqNum) 
+                    {
+                        switch (inst->MissPIDSquashType) 
+                        {
+                            case   MisspredictionType::PNA0:
+                            case   MisspredictionType::PMAN:
+                                zeroIdiomDueToMisspredictedPID(inst,tid);
+                                inst->clearDeferredDueToAliasCacheMiss();
+                                inst->setCanCommit();
 
-                        iewInstsToCommit[tid]++;
+                                DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
+                                        inst->seqNum, inst->pcState());
 
-                        // Notify potential listeners that execution is complete for this
-                        // instruction.
-                        ppToCommit->notify(inst);
-                        break;
-                      case   MisspredictionType::P0AN:
-                        fetchRedirect[tid] = true;
-                        squashDueToMispredictedPID(inst, tid);
-                        break;
-                      default:
-                        assert(0);
-                        break;
+                                iewInstsToCommit[tid]++;
+
+                                // Notify potential listeners that execution is complete for this
+                                // instruction.
+                                ppToCommit->notify(inst);
+                                break;
+                            case   MisspredictionType::P0AN:
+                                fetchRedirect[tid] = true;
+                                squashDueToMispredictedPID(inst, tid);
+                                break;
+                            default:
+                                assert(0);
+                                break;
+                        }
+                        continue;
                     }
-                    continue;
-                  }
-              }
+                }
 
-              inst->clearDeferredDueToAliasCacheMiss();
-              inst->setCanCommit();
+                inst->clearDeferredDueToAliasCacheMiss();
+                inst->setCanCommit();
 
-              DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
-                      inst->seqNum, inst->pcState());
+                DPRINTF(IEW, "Sending instructions to commit, [sn:%lli] PC %s.\n",
+                        inst->seqNum, inst->pcState());
 
-              iewInstsToCommit[tid]++;
+                iewInstsToCommit[tid]++;
 
-              // Notify potential listeners that execution is complete for this
-              // instruction.
-              ppToCommit->notify(inst);
-          }
+                // Notify potential listeners that execution is complete for this
+                // instruction.
+                ppToCommit->notify(inst);
+            }
         }
         checkSignalsAndUpdate(tid);
         dispatch(tid);

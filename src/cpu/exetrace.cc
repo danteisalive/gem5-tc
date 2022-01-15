@@ -142,6 +142,20 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
     //
     //  End of line...
     //
+
+    if (inst->isMicroop())
+    {
+        outs << " " << inst->getStaticPointerID() ;
+    }
+    else if (inst->isMacroop())
+    {
+        outs << " " << inst->getMacroopPid();
+    }
+    else
+    {
+        outs << "PID(UNK)";
+    }
+
     outs << endl;
 }
 

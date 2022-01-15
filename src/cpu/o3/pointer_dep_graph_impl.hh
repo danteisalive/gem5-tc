@@ -70,92 +70,7 @@ template <class Impl>
 void
 PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
 {
-
-    if (inst->isBoundsCheckMicroop()) return;
-
-
-    DPRINTF(PointerDepGraph, "Tracking Alias for Instruction: [%d][%s][%s]\n", 
-            inst->seqNum,
-            inst->pcState(), 
-            inst->staticInst->disassemble(inst->pcState().instAddr()));
-
-    DPRINTF(PointerDepGraph, "Dependency Graph Before Insert:\n");
-    dump();
-
-    //transfer capabilities
-    if (inst->isMallocBaseCollectorMicroop() ||
-        inst->isCallocBaseCollectorMicroop() ||
-        inst->isReallocBaseCollectorMicroop())
-    {
-        // here we generate a new PID and insert it into rax
-        dependGraph[X86ISA::INTREG_RAX].push_front(
-                                        PointerDepEntry(inst, inst->dyn_pid));
-        FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
-
-    }
-    else if (inst->isFreeCallMicroop() ||
-            inst->isReallocSizeCollectorMicroop())
-    {
-        dependGraph[X86ISA::INTREG_RDI].push_front(
-                                        PointerDepEntry(inst, inst->dyn_pid));
-        FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
-
-    }
-
-
-    else if (inst->staticInst->getName() == "mov") {TransferMovMicroops(inst);}
-    else if (inst->staticInst->getName() == "st") {TransferStoreMicroops(inst);}
-    else if (inst->staticInst->getName() == "ld") {TransferLoadMicroops(inst);}
-    else {
-
-        TheISA::PointerID _pid{0} ;
-        // for (size_t i = 0; i < inst->staticInst->numSrcRegs(); i++) {
-        //   if (inst->staticInst->srcRegIdx(i).isIntReg() &&
-        //       (inst->staticInst->srcRegIdx(i).index() < TheISA::NumIntRegs))
-        //   {
-        //       // if one of the sources is not pid(0), assign it to pid
-        //       // and break;
-        //       int src_reg_idx = inst->staticInst->srcRegIdx(i).index();
-        //       if (FetchArchRegsPid[src_reg_idx] != TheISA::PointerID(0))
-        //       {
-        //         _pid = FetchArchRegsPid[src_reg_idx];
-        //         break;
-        //       }
-        //   }
-        // }
-
-        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-          if (inst->staticInst->destRegIdx(i).isIntReg() &&
-              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-          {
-             // assign pid to all of the dest regs
-             int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-             dependGraph[dest_reg_idx].push_front(
-                                        PointerDepEntry(inst, _pid));
-             FetchArchRegsPid[dest_reg_idx] = _pid;
-          }
-        }
-
-    }
-
-
-    // zero out all interface regs for the next macroopp
-    if (inst->isLastMicroop()){
-      for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
-          //zero out all dest regs
-          FetchArchRegsPid[i] = TheISA::PointerID(0);
-      }
-    }
-
-    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
-        //snapshot
-        inst->FetchArchRegsPid[i] = FetchArchRegsPid[i];
-    }
-
-    DPRINTF(PointerDepGraph, "Dependency Graph After Insert:\n");
-    dump();
-
-
+    InternalUpdate(inst, true);   
 }
 
 template <class Impl>
@@ -214,6 +129,8 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
     DPRINTF(PointerDepGraph, "Dependency Graph Before Commiting:\n");
     dump();
 
+    // here set the final static PID as this is getting commited!
+    inst->staticInst->setStaticPointerID(inst->dyn_pid);
     // for all the dest regs for this inst, commit it
     // assert if the inst is not in the dependGraph
     for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
@@ -292,9 +209,10 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     
 
     if (inst->isBoundsCheckMicroop()) return; // we do not save these
-    if (!inst->isLoad()) {
-        panic("doUpdate called with a non-load instruction!");
-    }
+    assert (inst->isLoad() && "doUpdate called with a non-load instruction!") ;
+    assert((inst->staticInst->getName() == "ld" || inst->staticInst->getName() == "ldis") && 
+            "Not a ld or ldis instruction called with doUpdate()\n");
+    assert(inst->staticInst->getDataSize() == 8 && "data size is not 8!");
 
     DPRINTF(PointerDepGraph, "IEW Updating Alias for Instruction: [%d][%s][%s]\n", 
             inst->seqNum,
@@ -308,31 +226,20 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     // we should defenitly find it othersie it's a panic!
     // doUpdate happends before squash so we should find it in the DEP Graph
     bool found = false;
-    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) 
+    {
         // Erase  (C++11 and later)
-        for (auto it = dependGraph[indx].begin();
-            it != dependGraph[indx].end(); it++)
+        for (auto it = dependGraph[indx].begin(); it != dependGraph[indx].end(); it++)
         {
             //if found: update and return
             if (it->inst->seqNum == inst->seqNum) {
                 // get the actual PID for this load
                 TheISA::PointerID _pid = inst->macroop->getMacroopPid();
                 // insert an entry for the destination reg
-                for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-                    if (inst->staticInst->destRegIdx(i).isIntReg() &&
-                        (inst->staticInst->destRegIdx(i).index() <
-                                                  TheISA::NumIntRegs))
-                    {
-                        int dest_reg_idx =
-                            inst->staticInst->destRegIdx(i).index();
-                        panic_if(dest_reg_idx != indx,
-                          "destination reg id does not \
-                           match with updated load!");
-                        it->pid = _pid;
-                        inst->FetchArchRegsPid[dest_reg_idx] = _pid;
-                    }
-                }
-
+                X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+                uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+                assert(dest < TheISA::NumIntRegs);
+                inst->FetchArchRegsPid[dest] = _pid;
                 found = true;
                 break;
 
@@ -343,8 +250,6 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     if (!found) {
         return; // in the process of squashing.
     }
-    /*panic_if(!found, "Could not find the load uop\
-                     when updating the DEP Graph!");*/
 
     for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
         FetchArchRegsPid[indx] = inst->FetchArchRegsPid[indx];
@@ -353,22 +258,14 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     // than load uop and update their uops
      for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
          // Erase  (C++11 and later)
-         for (auto it = dependGraph[indx].rbegin();
-           it != dependGraph[indx].rend(); it++)
+         for (auto it = dependGraph[indx].rbegin(); it != dependGraph[indx].rend(); it++)
          {
              if (it->inst->seqNum > inst->seqNum) {
-               InternalUpdate(it->inst);
-               for (size_t idx = 0; idx < TheISA::NumIntRegs; idx++) {
-                   it->inst->FetchArchRegsPid[idx] = FetchArchRegsPid[idx];
-               }
+               InternalUpdate(it->inst, false);
              }
          }
      }
 
-    // now update FetchArchRegsPid with the latest values
-    //for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
-    //    FetchArchRegsPid[i] = dependGraph[i].front().pid;
-    //}
 
 
     DPRINTF(PointerDepGraph, "Dependency Graph After IEW Updating:\n");
@@ -380,111 +277,83 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
 {
-    assert(0);
-    #define ENABLE_DEP_GRAPH_INTERNAL_UPDATE 0
 
     if (inst->isBoundsCheckMicroop()) return;
 
-    if (inst->isLoad() && inst->staticInst->getDataSize() == 8)
+    DPRINTF(PointerDepGraph, "%s Alias for Instruction: [%d][%s][%s]\n", 
+            track ? "Tracking" : "Updating",
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()));
+
+    DPRINTF(PointerDepGraph, "Dependency Graph Before %s:\n", 
+            track ? "Tracking" : "Updating");
+    dump();
+
+
+    if ((track) && 
+        (inst->isMallocBaseCollectorMicroop() ||
+        inst->isCallocBaseCollectorMicroop() ||
+        inst->isReallocBaseCollectorMicroop()))
     {
-        // get the predicted PID for this load
-        TheISA::PointerID _pid = inst->macroop->getMacroopPid();
-        // insert an entry for the destination reg
-        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-            if (inst->staticInst->destRegIdx(i).isIntReg() &&
-                (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-            {
-                int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-                //dependGraph[dest_reg_idx].push_front(
-                  //                            PointerDepEntry(inst, _pid));
-                FetchArchRegsPid[dest_reg_idx] = _pid;
-            }
-        }
+        // here we generate a new PID and insert it into rax
+        dependGraph[X86ISA::INTREG_RAX].push_front(
+                                        PointerDepEntry(inst, inst->dyn_pid));
+        FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
+
     }
-    else if (inst->isLoad() && inst->staticInst->getDataSize() != 8)
+    else if ((track) && 
+            (inst->isFreeCallMicroop() || 
+            inst->isReallocSizeCollectorMicroop()))
     {
-        // this is defenitly not a pointer refill
-        // set the dest regs as PID(0)
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-            if (inst->staticInst->destRegIdx(i).isIntReg() &&
-               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-            {
-                int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-                //dependGraph[dest_reg_idx].push_front(
-                  //                            PointerDepEntry(inst, _pid));
-                FetchArchRegsPid[dest_reg_idx] = _pid;
-            }
-        }
+
+        dependGraph[X86ISA::INTREG_RDI].push_front(
+                                        PointerDepEntry(inst, inst->dyn_pid));
+        FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
+
     }
+    else if (inst->staticInst->getName() == "mov") {TransferMovMicroops(inst, track);}
+    else if (inst->staticInst->getName() == "st") {TransferStoreMicroops(inst, track);}
+    else if (inst->staticInst->getName() == "ld") {TransferLoadMicroops(inst, track);}
     else {
 
         TheISA::PointerID _pid{0} ;
-        for (size_t i = 0; i < inst->staticInst->numSrcRegs(); i++) {
-          if (inst->staticInst->srcRegIdx(i).isIntReg() &&
-              (inst->staticInst->srcRegIdx(i).index() < TheISA::NumIntRegs))
-          {
-              // if one of the sources is not pid(0), assign it to pid
-              // and break;
-              int src_reg_idx = inst->staticInst->srcRegIdx(i).index();
-              if (FetchArchRegsPid[src_reg_idx] != TheISA::PointerID(0))
-              {
-                _pid = FetchArchRegsPid[src_reg_idx];
-                break;
-              }
-          }
-        }
-
         for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
           if (inst->staticInst->destRegIdx(i).isIntReg() &&
               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
           {
              // assign pid to all of the dest regs
              int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-             //dependGraph[dest_reg_idx].push_front(
-               //                         PointerDepEntry(inst, _pid));
+             if (track)
+             {
+                dependGraph[dest_reg_idx].push_front(PointerDepEntry(inst, _pid));
+             }
+
              FetchArchRegsPid[dest_reg_idx] = _pid;
           }
         }
 
     }
-    // defenitly this is not a pointer transefer
-    // zero out all the dest regs
-/*    else if (inst->staticInst->getDataSize() != 8) {
 
-        TheISA::PointerID _pid = TheISA::PointerID(0);
-        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-          if (inst->staticInst->destRegIdx(i).isIntReg() &&
-              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-          {
-              // zero out all dest regs
-              int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-              //dependGraph[dest_reg_idx].push_front(
-                //                        PointerDepEntry(inst, _pid));
-              FetchArchRegsPid[dest_reg_idx] = _pid;
-          }
-        }
-    }
-*/
+
     // zero out all interface regs for the next macroopp
     if (inst->isLastMicroop()){
-      TheISA::PointerID _pid = TheISA::PointerID(0);
       for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
           //zero out all dest regs
-          FetchArchRegsPid[i] = _pid;
+          FetchArchRegsPid[i] = TheISA::PointerID(0);
       }
-      //dump();
     }
 
+    //snapshot
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
+        inst->FetchArchRegsPid[i] = FetchArchRegsPid[i];
+    }
 
-
-      if (ENABLE_DEP_GRAPH_INTERNAL_UPDATE)
-      {
-        dump();
-        std::cout << "-------------END--------------\n";
-      }
+    DPRINTF(PointerDepGraph, "Dependency Graph After %s:\n", 
+            track ? "Tracking" : "Updating");
+    dump();
 
 
 }
@@ -492,7 +361,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track)
 {
 
     assert(inst->numDestRegs() == 1 && "Invalid number of dest regs!\n");
@@ -529,7 +398,10 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst)
 
             FetchArchRegsPid[dest] = _pid;
 
-            dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+            if (track)
+            {
+                dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+            }
 
             inst->dyn_pid = _pid;
             
@@ -543,7 +415,7 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst, bool track)
 {
 
     assert(inst->numDestRegs() == 0 && "Invalid number of dest regs!\n");
@@ -595,7 +467,7 @@ PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track)
 {
 
     assert(inst->numDestRegs() == 1 && "Invalid number of dest regs!\n");
@@ -631,7 +503,11 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
 
         inst->dyn_pid = TheISA::PointerID(0);
 
-        dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+        if (track) 
+        {
+            dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+        }
+            
 
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
@@ -666,7 +542,11 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
 
         inst->dyn_pid = TheISA::PointerID(0);
 
-        dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+        if (track)
+        {
+            dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+        }
+            
 
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
@@ -700,7 +580,11 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst)
 
         inst->dyn_pid = _pid;
 
-        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+        if (track)
+        {
+            dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+        }
+            
 
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),

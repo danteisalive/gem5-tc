@@ -412,20 +412,11 @@ class BaseDynInst : public ExecContext, public RefCounted
       if (staticInst->getDataSize() != 8) return false;
 
       assert(isLoad());
-      assert(staticInst->numDestRegs() < 2); // are we sure?
-
-      if (staticInst->destRegIdx(0).isIntReg()){
-         int  dest = staticInst->destRegIdx(0).index();
-         if (dest > X86ISA::NUM_INTREGS + 15){
-              return false;
-        }
-        else {
-             return true;
-        }
-      }
-      else {
-        return false;
-      }
+      if(staticInst->getName() == "ld" || 
+         staticInst->getName() == "ldis") 
+          return true;
+      else      
+          return true;
 
    }
 
@@ -1093,6 +1084,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   Process *p = tc->getProcessPtr();
   Addr vpn = p->pTable->pageAlign(vaddr);
   auto it = tc->ShadowMemory.find(vpn);
+  cpu->ExeAliasCache->DumpShadowMemory(tc);
   if (it != tc->ShadowMemory.end() && it->second.size() != 0)
   {
     // there is an alias --> go to alias cache
@@ -1112,7 +1104,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
     }
   }
   else{
-    DPRINTF(TypeTracker, "isAliasCacheMissed::No Alias Found For VAddr=0x%x\n", vaddr);
+    DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::No Alias Found For VAddr=0x%x\n", vaddr);
     // there is no alias for this load
     cpu->ExeAliasCache->total_accesses++;
     cpu->ExeAliasCache->total_hits++;

@@ -1323,7 +1323,11 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
 
     }
 
-
+    if (tc->enableCapability &&
+        TrackAlias(head_inst))
+    {
+        cpu->PointerDepGraph.doCommit(head_inst);
+    }
 
     if (head_inst->traceData) {
         head_inst->traceData->setFetchSeq(head_inst->seqNum);
@@ -1463,11 +1467,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
 
-    if (tc->enableCapability &&
-        TrackAlias(head_inst))
-    {
-        cpu->PointerDepGraph.doCommit(head_inst);
-    }
+
 
     // Finally clear the head ROB entry.
     rob->retireHead(tid);

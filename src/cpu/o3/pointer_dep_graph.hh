@@ -110,7 +110,7 @@ class PointerDependencyGraph
     void doSquash(uint64_t squashedSeqNum);
 
     void doUpdate(DynInstPtr& inst);
-    void InternalUpdate(DynInstPtr &inst);
+    void InternalUpdate(DynInstPtr &inst, bool track);
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr &inst);
 
@@ -139,13 +139,13 @@ class PointerDependencyGraph
     // Debug variable, remove when done testing.
     unsigned memAllocCounter;
 
-    void TransferMovMicroops(DynInstPtr &inst);
-    void TransferStoreMicroops(DynInstPtr &inst);
-    void TransferLoadMicroops(DynInstPtr &inst);
-    void TransferAddMicroops(DynInstPtr &inst);
-    void TransferSubMicroops(DynInstPtr &inst);
-    void TransferAddImmMicroops(DynInstPtr &inst);
-    void TransferSubImmMicroops(DynInstPtr &inst);
+    void TransferMovMicroops(DynInstPtr &inst, bool track);
+    void TransferStoreMicroops(DynInstPtr &inst, bool track);
+    void TransferLoadMicroops(DynInstPtr &inst, bool track);
+    void TransferAddMicroops(DynInstPtr &inst, bool track);
+    void TransferSubMicroops(DynInstPtr &inst, bool track);
+    void TransferAddImmMicroops(DynInstPtr &inst, bool track);
+    void TransferSubImmMicroops(DynInstPtr &inst, bool track);
 
   public:
     // Debug variable, remove when done testing.

@@ -109,6 +109,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /** @} */
     bool isInjected;
 
+    TheISA::PointerID static_pid{0};
+
   public:
     bool isSquashedAfterInjection;
     /// @name Register information.
@@ -204,7 +206,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isFreeRetMicroop() const {return flags[IsFreeRetMicroop];}
     bool isBoundsCheckMicroop() const {return flags[IsBoundsCheckMicroop];}
     bool isBoundsCheckNeeded() const {return flags[IsBoundsCheckNeeded];}
-
+    void setStaticPointerID(TheISA::PointerID _pid) {static_pid = _pid;}
+    TheISA::PointerID getStaticPointerID(){return static_pid;}
     //This flag doesn't do anything yet
     bool isMicroBranch() const { return flags[IsMicroBranch]; }
     //@}
@@ -242,7 +245,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     /// The binary machine instruction.
     ExtMachInst machInst;
 
-    TheISA::PointerID static_pid{0};
+
     int PredictionConfidenceLevel;
     int PredictionPointerRefillConfidence;
 

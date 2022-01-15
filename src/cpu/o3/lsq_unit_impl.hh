@@ -1517,17 +1517,16 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
             inst->staticInst->isSquashedAfterInjection = true;
 
-            DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction: PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
-                    inst->pcState().instAddr(),
-                    inst->seqNum,
-                    inst->macroop->getMacroopPid(),
-                    pid);
-
             cpu->FalsePredict++;
             cpu->LVPTMissPredict++;
             if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
                 pid != TheISA::PointerID(0))
             {
+                DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid(),
+                    pid);
                 cpu->P0An++;
                 cpu->LVPTMissPredictP0An++;
                 cpu->updateFetchLVPT(inst, pid,
@@ -1547,6 +1546,11 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid != TheISA::PointerID(0))
             {
+                DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PMAN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid(),
+                    pid);
                cpu->PmAn++;
                cpu->LVPTMissPredictPmAn++;
                cpu->updateFetchLVPT(inst, pid,
@@ -1565,6 +1569,11 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
             {
+                DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PNA0 PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid(),
+                    pid);
                 cpu->PnA0++;
                 cpu->LVPTMissPredictPnA0++;
                 cpu->updateFetchLVPT(inst, pid,

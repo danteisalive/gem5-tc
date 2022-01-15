@@ -58,6 +58,9 @@
         "thread": "cpp",
         "cfenv": "cpp",
         "random": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "variant": "cpp"
     }
 }

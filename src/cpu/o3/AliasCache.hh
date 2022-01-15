@@ -52,7 +52,7 @@
 #include "debug/Capability.hh"
 #include "mem/page_table.hh"
 #include "sim/process.hh"
-#include "debug/TypeTracker.hh"
+#include "debug/AliasCache.hh"
 
 namespace X86ISA
 {
@@ -68,7 +68,7 @@ class LRUVictimCache
     {}
 
     bool VictimCacheInitiateRead(Addr vaddr){
-
+      return false;
       bool hit = false;
       // First find the entry, if found bring it to the top of the queue
       for (auto it = VictimCache.begin(); it != VictimCache.end(); )
@@ -94,6 +94,7 @@ class LRUVictimCache
     // whenever there is an eviction from the alias cache, this function is
     //called to store the eviction address
     void VictimCacheWriteBack(Addr vaddr){
+        return;
         // first look to see if we have the evicted address or not
         bool hit = false;
         // First find the entry, if found bring it to the top of the queue
@@ -110,14 +111,14 @@ class LRUVictimCache
         }
 
         if (hit){
-          DPRINTF(TypeTracker, "VictimCacheWriteBack :: Found the entry for EffAddr: 0x%x, bringing it to the top of the Store Queue!\n", 
+          DPRINTF(AliasCache, "VictimCacheWriteBack::Found the entry for EffAddr: 0x%x, bringing it to the top of the Store Queue!\n", 
                     vaddr);
           VictimCache.push_front(vaddr);
           return;
         }
 
         // by here we dont have any entry with the same address
-        DPRINTF(TypeTracker, "VictimCacheWriteBack :: Didn't Find the entry for EffAddr: 0x%x, pushing it to the top of the Store Queue!\n", 
+        DPRINTF(AliasCache, "VictimCacheWriteBack::Didn't Find the entry for EffAddr: 0x%x, pushing it to the top of the Store Queue!\n", 
                     vaddr);
         if (VictimCache.size() <= NumOfEntrys){
           VictimCache.push_front(vaddr);
@@ -195,7 +196,9 @@ class LRUAliasCache
         bool SquashEntry(uint64_t squashed_num);
 
         void print_stats() ;
-        void dump ();
+        void DumpAliasTableBuffer ();
+        void DumpShadowMemory(ThreadContext* tc);
+        void DumpAliasCache();
 
         uint64_t GetSize(){
            return ExeAliasTableBuffer.size();
