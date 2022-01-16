@@ -1492,7 +1492,7 @@ template <class Impl>
 void
 DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 {
-    
+
   ThreadContext * tc = cpu->tcBase(tid);
 
   if (tc->enableCapability){
@@ -1724,7 +1724,7 @@ DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &he
 
   const StaticInstPtr si = head_inst->staticInst;
   
-  if (si->getName() != "st") return;
+  if (si->getName() != "st" && si->getName() != "stis") return;
   // datasize should be 8 bytes othersiwe it's not a base address
   if (si->getDataSize() != 8) return; // only for 64 bits system
        // return if store is not pointed to the DS or SS section

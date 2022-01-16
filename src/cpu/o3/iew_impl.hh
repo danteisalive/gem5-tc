@@ -2018,7 +2018,7 @@ DefaultIEW<Impl>::IEWUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPt
 
   const StaticInstPtr si = inst->staticInst;
   
-  if (si->getName() != "st") return;
+  if (si->getName() != "st" && si->getName() != "stis") return;
   // datasize should be 8 bytes othersiwe it's not a base address
   if (si->getDataSize() != 8) return; // only for 64 bits system
        // return if store is not pointed to the DS or SS section

@@ -141,6 +141,7 @@ class PointerDependencyGraph
 
     void TransferMovMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferStoreMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferStoreInStackMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferLoadMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferLoadInStackMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferAddMicroops(DynInstPtr &inst, bool track, bool sanity);

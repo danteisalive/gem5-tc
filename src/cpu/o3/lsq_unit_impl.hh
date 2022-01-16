@@ -1498,12 +1498,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
 
    assert(inst->isLoad());
 
-   //if (!inst->destRegIdx(0).isIntReg()) return false;
-   if (si->getName() != "ld") return false;
+   if (si->getName() != "ld" && si->getName() != "ldis") return false;
 
-//    int  dest = si->getMemOpDataRegIndex();
-//    if (dest > X86ISA::NUM_INTREGS + 15)
-//       return false;
 
 
     cpu->NumOfAliasTableAccess++;
