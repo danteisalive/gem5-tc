@@ -129,7 +129,7 @@ namespace X86ISA
            
         reg_idx &= ~IntFoldBit;
 
-        assert(reg_idx < 38);
+        assert(reg_idx < TheISA::NumIntRegs);
 
         return reg_idx;
             

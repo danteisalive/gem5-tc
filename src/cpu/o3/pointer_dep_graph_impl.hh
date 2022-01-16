@@ -173,12 +173,12 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
         inst->isCallocBaseCollectorMicroop() ||
         inst->isReallocBaseCollectorMicroop()))
     {
-
+        // what should we do here?
     }
     else if ((inst->isFreeCallMicroop() || 
               inst->isReallocSizeCollectorMicroop()))
     {
-
+        // what should we do here?
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, false, true);}
@@ -189,10 +189,10 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
         for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
             if (inst->destRegIdx(i).isIntReg())
             {
-                // X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
-                // uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->destRegIdx(i)); 
+                X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+                uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->staticInst->destRegIdx(i)); 
 
-                // assert(dest_reg_idx < TheISA::NumIntRegs && "dest_reg_idx < TheISA::NumIntRegs!\n");
+                assert(dest_reg_idx < TheISA::NumIntRegs && "dest_reg_idx < TheISA::NumIntRegs!\n");
 
             }
         }
