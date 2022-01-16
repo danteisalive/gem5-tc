@@ -137,21 +137,70 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
       if (inst->staticInst->destRegIdx(i).isIntReg() &&
           (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
       {
-         // the inst should be at the end of the queue
-         int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-         panic_if(dependGraph[dest_reg_idx].back().inst->seqNum !=
-                  inst->seqNum,
-                  "Dangling inst in PointerDependGraph");
-         CommitArchRegsPid[dest_reg_idx] =
-                          dependGraph[dest_reg_idx].back().pid;
-         dependGraph[dest_reg_idx].back().inst = NULL;
-         dependGraph[dest_reg_idx].pop_back();
+            // the inst should be at the end of the queue
+            int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
+            
+            panic_if(dependGraph[dest_reg_idx].back().inst->seqNum !=
+                    inst->seqNum,
+                    "Dangling inst in PointerDependGraph");
+
+            // before commiting, perform a sanity check
+            PerformSanityCheck(inst);
+
+            CommitArchRegsPid[dest_reg_idx] =
+                            dependGraph[dest_reg_idx].back().pid;
+
+            dependGraph[dest_reg_idx].back().inst = NULL;
+            dependGraph[dest_reg_idx].pop_back();
 
       }
     }
 
     DPRINTF(PointerDepGraph, "Dependency Graph After Commiting:\n");
     dump();
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
+{
+
+    if (inst->isBoundsCheckMicroop()) return;
+
+
+    if ((inst->isMallocBaseCollectorMicroop() ||
+        inst->isCallocBaseCollectorMicroop() ||
+        inst->isReallocBaseCollectorMicroop()))
+    {
+
+    }
+    else if ((inst->isFreeCallMicroop() || 
+              inst->isReallocSizeCollectorMicroop()))
+    {
+
+    }
+    else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "ld")   {TransferLoadMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "ldis") {TransferLoadInStackMicroops(inst, false, true);}
+    else {
+
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
+            if (inst->destRegIdx(i).isIntReg())
+            {
+                // X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+                // uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->destRegIdx(i)); 
+
+                // assert(dest_reg_idx < TheISA::NumIntRegs && "dest_reg_idx < TheISA::NumIntRegs!\n");
+
+            }
+        }
+
+    }
+
+    return;
+
 }
 
 template <class Impl>
@@ -303,6 +352,8 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
                                         PointerDepEntry(inst, inst->dyn_pid));
         FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
 
+        DPRINTF(PointerDepGraph, "Malloc/Calloc/Realloc base collector is called! Assigned PID=%s\n", 
+                FetchArchRegsPid[X86ISA::INTREG_RAX]);
     }
     else if ((track) && 
             (inst->isFreeCallMicroop() || 
@@ -311,12 +362,14 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
 
         dependGraph[X86ISA::INTREG_RDI].push_front(
                                         PointerDepEntry(inst, inst->dyn_pid));
-        FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
-
+        //FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
+        DPRINTF(PointerDepGraph, "Free/Realloc is called! Invalidating PID=%s\n", 
+                FetchArchRegsPid[X86ISA::INTREG_RDI]);
     }
-    else if (inst->staticInst->getName() == "mov") {TransferMovMicroops(inst, track);}
-    else if (inst->staticInst->getName() == "st") {TransferStoreMicroops(inst, track);}
-    else if (inst->staticInst->getName() == "ld") {TransferLoadMicroops(inst, track);}
+    else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "ld")   {TransferLoadMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "ldis") {TransferLoadInStackMicroops(inst, track, false);}
     else {
 
         TheISA::PointerID _pid{0} ;
@@ -361,7 +414,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track)
+PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track, bool sanity)
 {
 
     assert(inst->numDestRegs() == 1 && "Invalid number of dest regs!\n");
@@ -382,6 +435,15 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track)
             assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
             assert(dest < TheISA::NumIntRegs);
 
+            // this is at commit to make sure everything is right! Don't do anything!
+            if (sanity)
+            {
+                if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && CommitArchRegsPid[src1] != TheISA::PointerID(0))
+                {
+                    assert(false && "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
+                }
+                return;
+            }
 
 
             DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== FetchArchRegsPid[%s]=[%d]\n", 
@@ -389,10 +451,6 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track)
                 TheISA::IntRegIndexStr(src1), 
                 FetchArchRegsPid[src1].getPID());
 
-            if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && FetchArchRegsPid[src1] != TheISA::PointerID(0))
-            {
-                assert(false && "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
-            }
 
             TheISA::PointerID _pid = FetchArchRegsPid[src1];
 
@@ -415,7 +473,7 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst, bool track)
+PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst, bool track, bool sanity)
 {
 
     assert(inst->numDestRegs() == 0 && "Invalid number of dest regs!\n");
@@ -442,16 +500,22 @@ PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst, bool track
                 TheISA::IntRegIndexStr(src0),
                 TheISA::IntRegIndexStr(src2), 
                 FetchArchRegsPid[src2].getPID());
+    
+    // this is at commit to make sure everything is right! Don't do anything!
+    if (sanity)
+    {
+        panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && (CommitArchRegsPid[src2] != TheISA::PointerID(0)),
+                            "TransferStoreMicroops :: Found a 1/2/4 bytes St Inst with data reg non-zero PID!\n");
 
-    panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && (FetchArchRegsPid[src2] != TheISA::PointerID(0)),
-                        "TransferStoreMicroops :: Found a 1/2/4 bytes St Inst with data reg non-zero PID!\n");
+        panic_if (!(inst->staticInst->getSegment() == TheISA::SEGMENT_REG_DS || inst->staticInst->getSegment() == TheISA::SEGMENT_REG_SS) 
+                        && (CommitArchRegsPid[src2] != TheISA::PointerID(0)), 
+                        "TransferStoreMicroops :: Found a St Inst with SS || DS segment reg that data reg is not PID(0)!\n");
 
-    panic_if (!(inst->staticInst->getSegment() == TheISA::SEGMENT_REG_DS || inst->staticInst->getSegment() == TheISA::SEGMENT_REG_SS) 
-                      && (FetchArchRegsPid[src2] != TheISA::PointerID(0)), 
-                      "TransferStoreMicroops :: Found a St Inst with SS || DS segment reg that data reg is not PID(0)!\n");
+        panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferStoreMicroops :: Found a St Microop with non-zero PID Index!\n");
+        return;
+    }
 
-    panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
-                    "TransferStoreMicroops :: Found a St Microop with non-zero PID Index!\n");
         
             
 
@@ -467,7 +531,7 @@ PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst, bool track
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track)
+PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track, bool sanity)
 {
 
     assert(inst->numDestRegs() == 1 && "Invalid number of dest regs!\n");
@@ -492,11 +556,14 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track)
         assert(dest < TheISA::NumIntRegs);
 
 
-
-        
-        panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+        // this is at commit to make sure everything is right! Don't do anything!
+        if (sanity)
+        {
+           panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
                         "TransferLoadeMicroops :: Found a 1/2 Ld Microop with non-zero PID Index!\n");
-            
+            return;
+        }
+       
                 
 
         FetchArchRegsPid[dest] = TheISA::PointerID(0);
@@ -532,10 +599,13 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track)
 
 
 
-        
-        panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+        // this is at commit to make sure everything is right! Don't do anything!
+        if (sanity)
+        {
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
                         "TransferLoadeMicroops :: Found a 4 Ld Microop with non-zero PID Index!\n");
-            
+            return;
+        }    
                 
 
         FetchArchRegsPid[dest] = TheISA::PointerID(0);
@@ -570,10 +640,153 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track)
 
 
 
-        
-        panic_if(FetchArchRegsPid[src0] != TheISA::PointerID(0), 
+        // this is at commit to make sure everything is right! Don't do anything!
+        if (sanity)
+        {
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
                         "TransferLoadeMicroops :: Found a 4 Ld Microop with non-zero PID Index!\n");
+            return;
+        }    
+                
+        TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+        FetchArchRegsPid[dest] = _pid;
+
+        inst->dyn_pid = _pid;
+
+        if (track)
+        {
+            dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+        }
             
+
+        DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].getPID());
+
+    }
+
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferLoadInStackMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+    assert(inst->numDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+
+
+    // This is 1/2 bytes Load Microop -- This should never be pointer refill!
+    if (dataSize == 2 || dataSize == 1)
+    {
+        X86ISAInst::Ldis * inst_ldis = dynamic_cast<X86ISAInst::Ldis*>(inst->staticInst.get()); 
+        assert(inst_ldis != nullptr && "Found a 1/2 bytes ldis inst that is not X86ISA::Ldis!\n");
+        //set the destnation register to PID(0)
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //dest
+        assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+        assert(dest < TheISA::NumIntRegs);
+
+
+
+        // this is at commit to make sure everything is right! Don't do anything!
+        if (sanity)
+        {
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 1/2 Ldis Microop with non-zero PID Index!\n");
+            return;
+        }   
+                
+
+        FetchArchRegsPid[dest] = TheISA::PointerID(0);
+
+        inst->dyn_pid = TheISA::PointerID(0);
+
+        if (track) 
+        {
+            dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+        }
+            
+
+        DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].getPID());
+
+        
+    }
+
+    else if ( dataSize == 4)
+    {
+        X86ISAInst::LdisBig * inst_ldisbig = dynamic_cast<X86ISAInst::LdisBig*>(inst->staticInst.get()); 
+        assert((inst_ldisbig != nullptr) && "Found a 4 bytes ldis inst that is not X86ISA::LdisBig!\n");
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+        assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+        assert(dest < TheISA::NumIntRegs);
+
+
+
+        // this is at commit to make sure everything is right! Don't do anything!
+        if (sanity)
+        {      
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 4 Ldis Microop with non-zero PID Index!\n");
+            return;
+        }    
+                
+
+        FetchArchRegsPid[dest] = TheISA::PointerID(0);
+
+        inst->dyn_pid = TheISA::PointerID(0);
+
+        if (track)
+        {
+            dependGraph[dest].push_front(PointerDepEntry(inst, TheISA::PointerID(0)));
+        }
+            
+
+        DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].getPID());
+
+
+    }
+    else 
+    {
+        X86ISAInst::LdisBig * inst_ldisbig = dynamic_cast<X86ISAInst::LdisBig*>(inst->staticInst.get()); 
+        assert((inst_ldisbig != nullptr) && "Found a 8 bytes ldis inst that is not X86ISA::LdisBig!\n");
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+        assert(src0 < TheISA::NumIntRegs && src1 < TheISA::NumIntRegs); 
+        assert(dest < TheISA::NumIntRegs);
+
+
+
+        // this is at commit to make sure everything is right! Don't do anything!
+        if (sanity)
+        {        
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 4 Ldis Microop with non-zero PID Index!\n");
+            return;
+        }    
                 
         TheISA::PointerID _pid = inst->macroop->getMacroopPid();
         FetchArchRegsPid[dest] = _pid;

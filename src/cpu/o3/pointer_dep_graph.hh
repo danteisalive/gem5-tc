@@ -139,13 +139,16 @@ class PointerDependencyGraph
     // Debug variable, remove when done testing.
     unsigned memAllocCounter;
 
-    void TransferMovMicroops(DynInstPtr &inst, bool track);
-    void TransferStoreMicroops(DynInstPtr &inst, bool track);
-    void TransferLoadMicroops(DynInstPtr &inst, bool track);
-    void TransferAddMicroops(DynInstPtr &inst, bool track);
-    void TransferSubMicroops(DynInstPtr &inst, bool track);
-    void TransferAddImmMicroops(DynInstPtr &inst, bool track);
-    void TransferSubImmMicroops(DynInstPtr &inst, bool track);
+    void TransferMovMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferStoreMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferLoadMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferLoadInStackMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferAddMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferSubMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferAddImmMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferSubImmMicroops(DynInstPtr &inst, bool track, bool sanity);
+
+    void PerformSanityCheck(DynInstPtr &inst);
 
   public:
     // Debug variable, remove when done testing.

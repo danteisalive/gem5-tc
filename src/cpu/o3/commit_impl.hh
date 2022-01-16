@@ -1492,7 +1492,7 @@ template <class Impl>
 void
 DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 {
-  #define ENABLE_EXE_COLLECTOR_DEBUG 0
+    
   ThreadContext * tc = cpu->tcBase(tid);
 
   if (tc->enableCapability){
@@ -1502,13 +1502,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::NONE)
             panic("AP_MALLOC_SIZE_COLLECT: Invalid Status!");
 
-        if (ENABLE_EXE_COLLECTOR_DEBUG)
-          {std::cout << std::hex << "IEW: MALLOC SIZE: " <<
-                  inst->readDestReg(inst->staticInst.get(),0) <<
-                  " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                  " " << inst->seqNum <<
-                  " " <<  std::hex << inst->pcState().instAddr() <<
-                  std::endl;}
 
         uint64_t _pid_num=cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
         uint64_t _pid_size=inst->readDestReg(inst->staticInst.get(),0);
@@ -1517,23 +1510,23 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
 
+        DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "MALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                _pid_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
+
+
     }
     else if (inst->isMallocBaseCollectorMicroop()){
 
-      if (tc->Collector_Status !=
-                            ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
-          panic("AP_MALLOC_BASE_COLLECT: Invalid Status!");
-
-      if (ENABLE_EXE_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "IEW: MALLOC BASE: " <<
-                    inst->readDestReg(inst->staticInst.get(),0) <<
-                    " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                    " " <<  inst->seqNum <<
-                    " " <<  std::hex << inst->pcState().instAddr() <<
-                    std::endl;}
+      if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
+            panic("AP_MALLOC_BASE_COLLECT: Invalid Status!");
 
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
+        DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "MALLOC BASE=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                _pid_base, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
         assert(_pid_num == tc->ap_pid);
 
@@ -1548,21 +1541,13 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         tc->num_of_allocations++;
         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
-        // rax now is a pointer
-        TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-      //  tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
+
 
     }
     else if (inst->isFreeCallMicroop()){
-        if (ENABLE_EXE_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "IEW: FREE CALL: " <<
-                  inst->readDestReg(inst->staticInst.get(),0) <<
-                  " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                  " " << inst->seqNum <<
-                  std::endl;
-        }
 
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
         //check whether we have the cap for this AP or not
         TheISA::PointerID _pid = TheISA::PointerID(0);
         Block* bk = NULL;
@@ -1582,23 +1567,19 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         }
 
         if (_pid != TheISA::PointerID(0))
-          cpu->ExeAliasCache->Invalidate(tc, _pid);
+        {
+            cpu->ExeAliasCache->Invalidate(tc, _pid);
 
-        // RDI is not a pointer anymore
-      //  tc->PointerTrackerTable[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
+            DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                    "FREE CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                    _pid_base, _pid, inst->seqNum, inst->pcState().instAddr());
+        }
 
     }
     else if (inst->isFreeRetMicroop()){
 
-      if (ENABLE_EXE_COLLECTOR_DEBUG)
-        {std::cout << std::hex << "IEW: FREE RET: " <<
-                inst->readDestReg(inst->staticInst.get(),0) <<
-                " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                " " << inst->seqNum <<
-                std::endl;}
-      // do nothing, just start tracking again.
-      // in commit we will check whether freeing was succesful or not
-
+      DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::FREE RET CALL\n");
+      
     }
     else if (inst->isCallocSizeCollectorMicroop()){
 
@@ -1607,19 +1588,14 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
       uint64_t _pid_num = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
       uint64_t _pid_size_arg1 = inst->readDestReg(inst->staticInst.get(),0);
-      uint64_t _pid_size_arg2 =
-                  inst->readIntRegOperand(inst->staticInst.get(),0);
+      uint64_t _pid_size_arg2 = inst->readIntRegOperand(inst->staticInst.get(),0);
       tc->ap_size = _pid_size_arg1 * _pid_size_arg2;
       tc->ap_pid = _pid_num;
       tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
-      // logs
-      if (ENABLE_EXE_COLLECTOR_DEBUG)
-      {
-        std::cout << std::hex << "IEW: CALLOC SIZE: " <<
-                inst->readDestReg(inst->staticInst.get(),0) <<
-                " " << tc->ap_size <<
-                std::endl;
-      }
+
+      DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "CALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                tc->ap_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
     }
     else if (inst->isCallocBaseCollectorMicroop()){
@@ -1628,16 +1604,12 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                         ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE)
           panic("AP_CALLOC_BASE_COLLECT: Invalid Status!");
 
-       // logs
-       if (ENABLE_EXE_COLLECTOR_DEBUG)
-         {std::cout << std::hex << "IEW: CALLOC BASE: " <<
-                     inst->readDestReg(inst->staticInst.get(),0) <<
-                     " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                     " " <<  inst->seqNum <<
-                     std::endl;}
-
          uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
          uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
+         DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "CALLOC BASE=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                _pid_base, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
          assert(_pid_num == tc->ap_pid);
 
@@ -1673,14 +1645,10 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       tc->ap_size = _pid_size_arg2;
       tc->ap_pid = _pid_num;
       tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
-      // logs
-      if (ENABLE_EXE_COLLECTOR_DEBUG)
-      {
-        std::cout << std::hex << "IEW: REALLOC SIZE: " <<
-                old_base_addr <<
-                " " << tc->ap_size <<
-                std::endl;
-      }
+
+      DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "REALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                tc->ap_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
       TheISA::PointerID _pid = TheISA::PointerID(0);
       Block fake;
@@ -1700,7 +1668,13 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       }
 
       if (_pid != TheISA::PointerID(0))
+      {
         cpu->ExeAliasCache->Invalidate(tc, _pid);
+
+        DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "REALLOC CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                old_base_addr, _pid, inst->seqNum, inst->pcState().instAddr());
+      }
 
 
     }
@@ -1710,17 +1684,12 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
                   ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
             panic("AP_REALLOC_BASE_COLLECT: Invalid Status!");
 
-             // logs
-            if (ENABLE_EXE_COLLECTOR_DEBUG)
-            {std::cout << std::hex << "IEW: REALLOC BASE: " <<
-                      inst->readDestReg(inst->staticInst.get(),0) <<
-                      " " << cpu->readArchIntReg(X86ISA::INTREG_R16, tid) <<
-                      " " <<  inst->seqNum <<
-                          std::endl;
-            }
-
             uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
             uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+
+            DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+                "REALLOC BASE=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                _pid_base, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
             assert(_pid_num == tc->ap_pid);
 
@@ -1735,9 +1704,6 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
             tc->num_of_allocations++;
             tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
-            // rax now is a pointer
-            TheISA::PointerID _pid = TheISA::PointerID(_pid_num);
-          //  tc->PointerTrackerTable[X86ISA::INTREG_RAX] = _pid;
 
     }
   }
