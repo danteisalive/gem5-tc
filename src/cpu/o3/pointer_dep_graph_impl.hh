@@ -133,6 +133,42 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
     inst->staticInst->setStaticPointerID(inst->dyn_pid);
     // for all the dest regs for this inst, commit it
     // assert if the inst is not in the dependGraph
+
+    for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) 
+    {
+        if (inst->destRegIdx(i).isIntReg())
+        {
+            X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+            uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->staticInst->destRegIdx(i)); 
+            
+            panic_if(dependGraph[dest_reg_idx].back().inst->seqNum !=
+                    inst->seqNum,
+                    "Dangling inst in PointerDependGraph");
+
+            // before commiting, perform a sanity check
+            PerformSanityCheck(inst);
+
+            DPRINTF(PointerDepGraph, "Setting: CommitArchRegsPid[%d]=%s\n",
+                    TheISA::IntRegIndexStr(dest_reg_idx), dependGraph[dest_reg_idx].back().pid);
+            CommitArchRegsPid[dest_reg_idx] =
+                            dependGraph[dest_reg_idx].back().pid;
+
+            // zero out all interface regs for the next macroopp
+            if (dependGraph[dest_reg_idx].back().inst->isLastMicroop())
+            {
+                DPRINTF(PointerDepGraph, "Last Microop in Macroop! Setting all T[n] regs to PID(0)!\n");
+                for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
+                    //zero out all dest regs
+                    CommitArchRegsPid[i] = TheISA::PointerID(0);
+                }
+            }
+
+            dependGraph[dest_reg_idx].back().inst = NULL;
+            dependGraph[dest_reg_idx].pop_back();
+        }
+    }
+    
+/*
     for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
       if (inst->staticInst->destRegIdx(i).isIntReg() &&
           (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
@@ -167,7 +203,7 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
 
       }
     }
-
+*/
     DPRINTF(PointerDepGraph, "Dependency Graph After Commiting:\n");
     dump();
 }
@@ -402,6 +438,23 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
     else {
 
         TheISA::PointerID _pid{0} ;
+
+        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) 
+        {
+            if (inst->destRegIdx(i).isIntReg())
+            {
+                X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+                uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->staticInst->destRegIdx(i)); 
+
+                if (track)
+                {
+                    dependGraph[dest_reg_idx].push_front(PointerDepEntry(inst, _pid));
+                }
+
+                FetchArchRegsPid[dest_reg_idx] = _pid;
+            }
+        }
+        /*
         for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
           if (inst->staticInst->destRegIdx(i).isIntReg() &&
               (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
@@ -416,6 +469,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
              FetchArchRegsPid[dest_reg_idx] = _pid;
           }
         }
+        */
 
     }
 
