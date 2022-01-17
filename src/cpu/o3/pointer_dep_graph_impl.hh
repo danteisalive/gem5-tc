@@ -167,43 +167,7 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
             dependGraph[dest_reg_idx].pop_back();
         }
     }
-    
-/*
-    for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-      if (inst->staticInst->destRegIdx(i).isIntReg() &&
-          (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-      {
-            // the inst should be at the end of the queue
-            int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-            
-            panic_if(dependGraph[dest_reg_idx].back().inst->seqNum !=
-                    inst->seqNum,
-                    "Dangling inst in PointerDependGraph");
-
-            // before commiting, perform a sanity check
-            PerformSanityCheck(inst);
-
-            DPRINTF(PointerDepGraph, "Setting: CommitArchRegsPid[%d]=%s\n",
-                    TheISA::IntRegIndexStr(dest_reg_idx), dependGraph[dest_reg_idx].back().pid);
-            CommitArchRegsPid[dest_reg_idx] =
-                            dependGraph[dest_reg_idx].back().pid;
-
-            // zero out all interface regs for the next macroopp
-            if (dependGraph[dest_reg_idx].back().inst->isLastMicroop())
-            {
-                DPRINTF(PointerDepGraph, "Last Microop in Macroop! Setting all T[n] regs to PID(0)!\n");
-                for (size_t i = X86ISA::NUM_INTREGS; i < TheISA::NumIntRegs; i++) {
-                    //zero out all dest regs
-                    CommitArchRegsPid[i] = TheISA::PointerID(0);
-                }
-            }
-
-            dependGraph[dest_reg_idx].back().inst = NULL;
-            dependGraph[dest_reg_idx].pop_back();
-
-      }
-    }
-*/
+   
     DPRINTF(PointerDepGraph, "Dependency Graph After Commiting:\n");
     dump();
 }
@@ -228,16 +192,83 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
     {
         // what should we do here?
     }
-    else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "stis")   {TransferStoreInStackMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "ld")   {TransferLoadMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "ldis") {TransferLoadInStackMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "add") {TransferAddMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "sub") {TransferSubMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "addi") {TransferAddImmMicroops(inst, false, true);}
-    else if (inst->staticInst->getName() == "subi") {TransferSubImmMicroops(inst, false, true);}
-    
+    else if (inst->staticInst->getName() == "mov")          {TransferMovMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "add")          {TransferAddMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "sub")          {TransferSubMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "addi")         {TransferAddImmMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "subi")         {TransferSubImmMicroops(inst, false, true);}
+    else if (inst->isLoad())
+    {
+        if (inst->staticInst->getName() == "ld")                {TransferLoadMicroops(inst, false, true);}
+        else if (inst->staticInst->getName() == "ldis")         {TransferLoadInStackMicroops(inst, false, true);}
+        else if (inst->staticInst->getName() == "ldst" 
+                || inst->staticInst->getName() == "ldstl")      {TransferLoadStoreMicroops(inst, false, true);}
+        else if (inst->staticInst->getName() == "ldsplit"
+                || inst->staticInst->getName() == "ldsplitl")   {TransferLoadSplitMicroops(inst, false, true);} 
+        else 
+        {
+            // name them
+            panic_if(inst->staticInst->getName() != "ldfp" && 
+                    inst->staticInst->getName() != "ldfp87" &&
+                    inst->staticInst->getName() != "ldifp87", 
+                    "Unknown Load Type: %s\n", inst->staticInst->getName());
+
+            // make sure thier index reg is PID(0)
+            assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+            TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+            const uint8_t dataSize = inst_regop->dataSize;
+            assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+            X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+            uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+
+
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a Floating Point Microop with non-zero PID Index!\n");
+                
+            panic_if(inst->dyn_pid != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a Floating Point Microop with non-zero PID Dest!\n");
+
+            
+        }
+    } 
+    else if (inst->isStore())
+    {
+        if (inst->staticInst->getName() == "st")                    {TransferStoreMicroops(inst, false, true);}
+        else if (inst->staticInst->getName() == "stis")             {TransferStoreInStackMicroops(inst, false, true);}
+        else if (inst->staticInst->getName() == "stul")             {TransferStoreUnsignedLongMicroops(inst, false, true);} 
+        else if (inst->staticInst->getName() == "stsplit"
+                || inst->staticInst->getName() == "stsplitul")      {TransferStoreSplitMicroops(inst, false, true);} 
+        else 
+        {
+            // name them
+            panic_if(inst->staticInst->getName() != "stfp" && 
+                    inst->staticInst->getName() != "stfp87" &&
+                    inst->staticInst->getName() != "cda" &&
+                    inst->staticInst->getName() != "clflushopt" && 
+                    inst->staticInst->getName() != "clwb", 
+                    "Unknown Store Type: %s\n", inst->staticInst->getName());
+            // make sure thier index reg is PID(0)
+            assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+            TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+            const uint8_t dataSize = inst_regop->dataSize;
+            assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+            X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+            uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+
+
+            panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a Floating Point Microop with non-zero PID Index!\n");
+                
+            panic_if(inst->dyn_pid != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a Floating Point Microop with non-zero PID Dest!\n");
+
+        }
+          
+    }
     else {
 
         for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
@@ -247,6 +278,10 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
                 uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->staticInst->destRegIdx(i)); 
                 dest_reg_idx = dest_reg_idx;
                 // what do need to check here?! 
+
+                panic_if(inst->dyn_pid != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a \"%s\" Microop with non-zero PID Dest!\n",
+                        inst->staticInst->getName());
             }
         }
 
@@ -438,7 +473,6 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
     else {
 
         TheISA::PointerID _pid{0} ;
-
         for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) 
         {
             if (inst->destRegIdx(i).isIntReg())
@@ -454,22 +488,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
                 FetchArchRegsPid[dest_reg_idx] = _pid;
             }
         }
-        /*
-        for (size_t i = 0; i < inst->staticInst->numDestRegs(); i++) {
-          if (inst->staticInst->destRegIdx(i).isIntReg() &&
-              (inst->staticInst->destRegIdx(i).index() < TheISA::NumIntRegs))
-          {
-             // assign pid to all of the dest regs
-             int dest_reg_idx = inst->staticInst->destRegIdx(i).index();
-             if (track)
-             {
-                dependGraph[dest_reg_idx].push_front(PointerDepEntry(inst, _pid));
-             }
 
-             FetchArchRegsPid[dest_reg_idx] = _pid;
-          }
-        }
-        */
 
     }
 
@@ -1167,5 +1186,131 @@ PointerDependencyGraph<Impl>::TransferSubImmMicroops(DynInstPtr &inst, bool trac
     inst->dyn_pid = _pid;
    
 }
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferLoadStoreMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base 
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+    src1 = src1; dest = dest;
+
+    if (sanity)
+    {
+        panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a LdSt Microop with non-zero PID Index!\n");
+        
+        panic_if(inst->dyn_pid != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a LdSt Microop with non-zero PID Dest!\n");
+        
+        return;
+    }
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferLoadSplitMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+    assert(inst->numIntDestRegs() == 2 && "Invalid number of dest regs!\n");
+    TheISA::LdStSplitOp * inst_regop = (TheISA::LdStSplitOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base 
+    uint16_t dest0 = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest_low
+    uint16_t dest1 = x86_inst->getUnflattenRegIndex(inst->destRegIdx(1)); //dest_high
+    src1 = src1; dest0 = dest0; dest1 = dest1;
+
+    if (sanity)
+    {
+        panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a LdSplit Microop with non-zero PID Index!\n");
+        
+        panic_if(inst->dyn_pid != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a LdSplit Microop with non-zero PID dest!\n");
+    
+        return;
+    }
+}
+
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferStoreUnsignedLongMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+    assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base 
+    uint16_t dest0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //dest
+    src1 = src1; 
+
+    if (sanity)
+    {
+        panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a Stul Microop with non-zero PID Index!\n");
+        
+        panic_if(CommitArchRegsPid[dest0] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a Stul Microop with non-zero PID Low Dest!\n");
+   
+        return;
+    }
+}
+
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferStoreSplitMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+    assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+    TheISA::LdStSplitOp * inst_regop = (TheISA::LdStSplitOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base 
+    uint16_t dest0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //dest low
+    uint16_t dest1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(3)); //dest high
+    src1 = src1; 
+
+    if (sanity)
+    {
+        panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a StSplit Microop with non-zero PID Index!\n");
+        
+        panic_if(CommitArchRegsPid[dest0] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a StSplit Microop with non-zero PID Low Dest!\n");
+   
+        panic_if(CommitArchRegsPid[dest1] != TheISA::PointerID(0), 
+                "TransferLoadeMicroops :: Found a StSplit Microop with non-zero PID High Dest!\n");
+        return;
+    }
+}
+
 
 #endif // __CPU_O3_DEP_GRAPH_HH__
