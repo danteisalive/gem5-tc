@@ -197,6 +197,10 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
     else if (inst->staticInst->getName() == "sub")          {TransferSubMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "addi")         {TransferAddImmMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "subi")         {TransferSubImmMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "and")          {TransferAndMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "andi")         {TransferAndImmMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "xor")          {TransferXorMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "xori")         {TransferXorImmMicroops(inst, false, true);}
     else if (inst->isLoad())
     {
         if (inst->staticInst->getName() == "ld")                {TransferLoadMicroops(inst, false, true);}
@@ -463,13 +467,17 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, track, false);}
-    else if (inst->staticInst->getName() == "stis")   {TransferStoreInStackMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "stis") {TransferStoreInStackMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "ld")   {TransferLoadMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "ldis") {TransferLoadInStackMicroops(inst, track, false);}
-    else if (inst->staticInst->getName() == "add") {TransferAddMicroops(inst, track, false);}
-    else if (inst->staticInst->getName() == "sub") {TransferSubMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "add")  {TransferAddMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "sub")  {TransferSubMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "addi") {TransferAddImmMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "subi") {TransferSubImmMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "and")  {TransferAndMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "andi")  {TransferAndImmMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "xor")  {TransferXorMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "xori")  {TransferXorImmMicroops(inst, track, false);}
     else {
 
         TheISA::PointerID _pid{0} ;
@@ -1310,6 +1318,276 @@ PointerDependencyGraph<Impl>::TransferStoreSplitMicroops(DynInstPtr &inst, bool 
                 "TransferLoadeMicroops :: Found a StSplit Microop with non-zero PID High Dest!\n");
         return;
     }
+}
+
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferAndMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::RegOp * inst_regop = (TheISA::RegOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISAInst::And * inst_and = dynamic_cast<X86ISAInst::And*>(inst->staticInst.get()); 
+    X86ISAInst::AndBig * inst_and_big = dynamic_cast<X86ISAInst::AndBig*>(inst->staticInst.get()); 
+    
+    X86ISAInst::AndFlags * inst_and_flags = dynamic_cast<X86ISAInst::AndFlags*>(inst->staticInst.get());
+    X86ISAInst::AndFlagsBig * inst_and_flags_big = dynamic_cast<X86ISAInst::AndFlagsBig*>(inst->staticInst.get());
+
+    assert((inst_and != nullptr || inst_and_big != nullptr ||
+            inst_and_flags != nullptr || inst_and_flags_big != nullptr) 
+            && "Found an and inst that is not And/AndBig or AndFlags/AndFlagsBig!\n");
+
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); 
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1));
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0));
+
+            
+            
+    // this is at commit to make sure everything is right! Don't do anything!
+    if (sanity)
+    {
+        panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
+                (CommitArchRegsPid[src1] != TheISA::PointerID(0) || CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
+                "Found a 1/2/4 bytes And Inst with non-zero PID sources! " 
+                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+
+        panic_if((dataSize == 8) && 
+                (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)) &&
+                (CommitArchRegsPid[src1] != CommitArchRegsPid[src0]), 
+                "TransferStoreMicroops :: Found an And inst with both regs that have no equal non-zero PID! "
+                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+
+        return;
+    }
+
+
+    DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== SRC1Pid[%d][%s] & SRC2Pid[%d][%s]\n", 
+            TheISA::IntRegIndexStr(dest),
+            TheISA::IntRegIndexStr(src0),
+            FetchArchRegsPid[src0],
+            TheISA::IntRegIndexStr(src1), 
+            FetchArchRegsPid[src1]);
+
+    
+    TheISA::PointerID _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
+
+    FetchArchRegsPid[dest] = _pid;
+
+    if (track)
+    {
+        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+    }
+
+    inst->dyn_pid = _pid;
+            
+
+}
+
+
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferAndImmMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::RegOpImm * inst_regop = (TheISA::RegOpImm * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISAInst::AndImm * inst_and_imm = dynamic_cast<X86ISAInst::AndImm*>(inst->staticInst.get()); 
+    X86ISAInst::AndImmBig * inst_and_imm_big = dynamic_cast<X86ISAInst::AndImmBig*>(inst->staticInst.get()); 
+    
+    X86ISAInst::AndFlagsImm * inst_and_imm_flags = dynamic_cast<X86ISAInst::AndFlagsImm*>(inst->staticInst.get());
+    X86ISAInst::AndFlagsImmBig * inst_and_imm_flags_big = dynamic_cast<X86ISAInst::AndFlagsImmBig*>(inst->staticInst.get());
+
+    assert((inst_and_imm != nullptr || inst_and_imm_big != nullptr ||
+            inst_and_imm_flags != nullptr || inst_and_imm_flags_big != nullptr) 
+            && "Found an and inst that is not AndImm/AndImmBig or AndImmFlags/AndImmFlagsBig!\n");
+
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); 
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0));
+
+            
+            
+    // this is at commit to make sure everything is right! Don't do anything!
+    if (sanity)
+    {
+        panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
+                (CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
+                "Found a 1/2/4 bytes AndImm Inst with non-zero PID sources! " 
+                "SRC1 = %s\n", CommitArchRegsPid[src0]);
+
+        return;
+    }
+
+
+    DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== SRC1Pid[%d][%s] & Imm\n", 
+            TheISA::IntRegIndexStr(dest),
+            TheISA::IntRegIndexStr(src0),
+            FetchArchRegsPid[src0]);
+
+    
+    TheISA::PointerID _pid = FetchArchRegsPid[src0];
+
+    FetchArchRegsPid[dest] = _pid;
+
+    if (track)
+    {
+        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+    }
+
+    inst->dyn_pid = _pid;
+            
+
+}
+
+
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferXorMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::RegOp * inst_regop = (TheISA::RegOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISAInst::Xor * inst_xor = dynamic_cast<X86ISAInst::Xor*>(inst->staticInst.get()); 
+    X86ISAInst::XorBig * inst_xor_big = dynamic_cast<X86ISAInst::XorBig*>(inst->staticInst.get()); 
+    
+    X86ISAInst::XorFlags * inst_xor_flags = dynamic_cast<X86ISAInst::XorFlags*>(inst->staticInst.get());
+    X86ISAInst::XorFlagsBig * inst_xor_flags_big = dynamic_cast<X86ISAInst::XorFlagsBig*>(inst->staticInst.get());
+
+    assert((inst_xor != nullptr || inst_xor_big != nullptr ||
+            inst_xor_flags != nullptr || inst_xor_flags_big != nullptr) 
+            && "Found an and inst that is not Xor/XorBig or XorFlags/XorFlagsBig!\n");
+
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); 
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1));
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0));
+
+            
+            
+    // this is at commit to make sure everything is right! Don't do anything!
+    if (sanity)
+    {
+        panic_if(( dataSize == 2 || dataSize == 1) && 
+                (CommitArchRegsPid[src1] != TheISA::PointerID(0) || CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
+                "Found a 1/2/4 bytes Xor Inst with non-zero PID sources! " 
+                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+
+
+        panic_if((dataSize == 4 || dataSize == 8) && 
+                (CommitArchRegsPid[src1] != CommitArchRegsPid[src0]), 
+                "TransferStoreMicroops :: Found an Xor inst with both regs that have no equal non-zero PID! "
+                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+        return;
+    }
+
+
+    DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== SRC1Pid[%d][%s] ^ SRC2Pid[%d][%s]\n", 
+            TheISA::IntRegIndexStr(dest),
+            TheISA::IntRegIndexStr(src0),
+            FetchArchRegsPid[src0],
+            TheISA::IntRegIndexStr(src1), 
+            FetchArchRegsPid[src1]);
+
+    
+    TheISA::PointerID _pid = TheISA::PointerID(0);
+
+    FetchArchRegsPid[dest] = _pid;
+
+    if (track)
+    {
+        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+    }
+
+    inst->dyn_pid = _pid;
+            
+
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferXorImmMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::RegOpImm * inst_regop = (TheISA::RegOpImm * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    X86ISAInst::XorImm * inst_xor_imm = dynamic_cast<X86ISAInst::XorImm*>(inst->staticInst.get()); 
+    X86ISAInst::XorImmBig * inst_xor_imm_big = dynamic_cast<X86ISAInst::XorImmBig*>(inst->staticInst.get()); 
+    
+    X86ISAInst::XorFlagsImm * inst_xor_imm_flags = dynamic_cast<X86ISAInst::XorFlagsImm*>(inst->staticInst.get());
+    X86ISAInst::XorFlagsImmBig * inst_xor_imm_flags_big = dynamic_cast<X86ISAInst::XorFlagsImmBig*>(inst->staticInst.get());
+
+    assert((inst_xor_imm != nullptr || inst_xor_imm_big != nullptr ||
+            inst_xor_imm_flags != nullptr || inst_xor_imm_flags_big != nullptr) 
+            && "Found an and inst that is not XorImm/XorImmBig or XorImmFlags/XorImmFlagsBig!\n");
+
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); 
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0));
+
+            
+            
+    // this is at commit to make sure everything is right! Don't do anything!
+    if (sanity)
+    {
+        panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
+                (CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
+                "Found a 1/2/4 bytes XorImm Inst with non-zero PID sources! " 
+                "SRC1 = %s\n", CommitArchRegsPid[src0]);
+
+        return;
+    }
+
+
+    DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== SRC1Pid[%d][%s] ^ Imm\n", 
+            TheISA::IntRegIndexStr(dest),
+            TheISA::IntRegIndexStr(src0),
+            FetchArchRegsPid[src0]);
+
+    
+    TheISA::PointerID _pid = TheISA::PointerID(0);
+
+    FetchArchRegsPid[dest] = _pid;
+
+    if (track)
+    {
+        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+    }
+
+    inst->dyn_pid = _pid;
+            
+
 }
 
 
