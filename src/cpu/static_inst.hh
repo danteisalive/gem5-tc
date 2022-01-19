@@ -350,7 +350,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     virtual void injectMicroops(ThreadContext * _tc,
                                 TheISA::PCState &nextPC,
-                                TheISA::TyCHEAllocationPoint _sym
+                                TheISA::TyCHEAllocationPoint _sym,
+                                TheISA::PointerID _pid
                                );
     bool hasInjection(){ return isInjected; }
 
@@ -358,7 +359,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     virtual void deleteMicroOps();
 
     virtual uint64_t getNumOfMicroops();
-    virtual bool injectCheckMicroops(
+    virtual TheISA::PointerID injectCheckMicroops(
             std::array<TheISA::PointerID,
             TheISA::NumIntRegs> _fetchArchRegsPid);
     virtual void updatePointerTracker(

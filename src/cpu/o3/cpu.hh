@@ -627,7 +627,7 @@ class FullO3CPU : public BaseO3CPU
      */
     bool removeInstsThisCycle;
 
-  protected:
+  public:
     /** The fetch stage. */
     typename CPUPolicy::Fetch fetch;
 

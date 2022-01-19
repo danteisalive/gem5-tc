@@ -144,13 +144,15 @@ public:
     }
 
     bool filterInst(ThreadContext * tc,PCState &nextPC);
-    bool injectCheckMicroops(
+    TheISA::PointerID injectCheckMicroops(
         std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid);
 
     void updatePointerTracker(ThreadContext * tc, PCState &nextPC);
 
-    void injectMicroops( ThreadContext * _tc, PCState &nextPC,
-                         TheISA::TyCHEAllocationPoint _sym
+    void injectMicroops( ThreadContext * _tc, 
+                         PCState &nextPC,
+                         TheISA::TyCHEAllocationPoint _sym,
+                         TheISA::PointerID _pid
                        );
 
     void injectAPMallocBaseCollector(ThreadContext * _tc,PCState &nextPC);
@@ -165,7 +167,7 @@ public:
     void injectAPFreeCall(ThreadContext * _tc,PCState &nextPC);
     void injectAPFreeRet(ThreadContext * _tc,PCState &nextPC);
 
-    void injectBoundsCheck(PCState &nextPC);
+    void injectBoundsCheck(PCState &nextPC, TheISA::PointerID _pid);
     void undoInjecttion();
     void deleteMicroOps();
 

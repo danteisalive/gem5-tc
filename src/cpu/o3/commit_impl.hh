@@ -1324,7 +1324,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability &&
-        TrackAlias(head_inst))
+        cpu->fetch.TrackAlias(tc, head_inst->pcState().pc()))
     {
         cpu->PointerDepGraph.doCommit(head_inst);
     }
@@ -1763,7 +1763,7 @@ DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
   // exact replica of updateAliasTable in IEW
   if (head_inst->isMicroopInjected()) return;
   if (head_inst->isBoundsCheckMicroop()) return;
-  if (!TrackAlias(head_inst)) return;   // dont care about AP functions
+  if (!cpu->fetch.TrackAlias(tc, (Addr)head_inst->pcState().pc())) return;   // dont care about AP functions
 
   // datasize should be 4/8 bytes othersiwe it's not a base address
   if (si->getDataSize() != 8) return; // only for 64 bits system
@@ -2031,30 +2031,6 @@ DefaultCommit<Impl>::oldestReady()
     } else {
         return InvalidThreadID;
     }
-}
-
-template <class Impl>
-bool
-DefaultCommit<Impl>::TrackAlias(DynInstPtr& inst){
-
-    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
-
-    Block fake;
-    fake.payload = (Addr)inst->pcState().pc();
-    fake.req_szB = 1;
-    UWord foundkey = 1;
-    UWord foundval = 1;
-    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
-                                    &foundkey, &foundval, (UWord)&fake );
-    if (found)
-    {
-      return true;
-    }
-    else
-    {
-      return false;
-    }
-
 }
 
 

@@ -75,28 +75,27 @@ void MacroopBase::updatePointerTracker(ThreadContext * tc, PCState &nextPC)
 }
 
 
-bool MacroopBase::injectCheckMicroops(
+TheISA::PointerID MacroopBase::injectCheckMicroops(
         std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid)
 {
 
-  return false; // DISABLE ME!
   
   if ((numMicroops > 0) && (!isInjected))
   {
 
-      for (int j = 0; j < numMicroops; ++j)
-      {   // do not inject into macroops which have control microops
-          // TODO: function pointers have these kind of microops
-          if (microops[j]->isControl() ||
-              microops[j]->isDirectCtrl() ||
-              microops[j]->isIndirectCtrl() ||
-              microops[j]->isCondCtrl() ||
-              microops[j]->isUncondCtrl() ||
-              microops[j]->isMicroBranch())
-          {
-              return false;
-          }
-      }
+    //   for (int j = 0; j < numMicroops; ++j)
+    //   {   // do not inject into macroops which have control microops
+    //       // TODO: function pointers have these kind of microops
+    //       if (microops[j]->isControl() ||
+    //           microops[j]->isDirectCtrl() ||
+    //           microops[j]->isIndirectCtrl() ||
+    //           microops[j]->isCondCtrl() ||
+    //           microops[j]->isUncondCtrl() ||
+    //           microops[j]->isMicroBranch())
+    //       {
+    //           return false;
+    //       }
+    //   }
 
       int i;
       for (i = 0; i < numMicroops; ++i)
@@ -106,34 +105,38 @@ bool MacroopBase::injectCheckMicroops(
           if (microops[i]->isLoad() || microops[i]->isStore())
           {
               //rule #1: all load and stores are integer microops!
-              assert(microops[i]->isInteger());
+            //   assert(microops[i]->isInteger());
               // we can filter explicit load/stores to stack
               // there are some implicit stack loads/stores which we don't want
-              if (microops[i]->getBase() == X86ISA::INTREG_RSP)
-              {
-                continue;
-              }
-              else {
-                if (microops[i]->getBase() < TheISA::NumIntRegs){
-                    if (_fetchArchRegsPid[microops[i]->getBase()] !=
-                        TheISA::PointerID(0))
-                    {
-  //                      std::cout << "Injecting: " << microops[i]->getBase() << _fetchArchRegsPid[microops[i]->getBase()] << "\n";
-                        return true;
-                    }
+            //   if (microops[i]->getBase() == X86ISA::INTREG_RSP)
+            //   {
+            //     continue;
+            //   }
+            //   else {
+
+                X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)microops[i].get();
+
+                uint16_t src1 = x86_inst->getUnflattenRegIndex(microops[i]->srcRegIdx(1)); //base
+
+                if (_fetchArchRegsPid[src1] != TheISA::PointerID(0))
+                {
+                    DPRINTF(TypeTracker, "Found a Store/Load that requires injection! BaseRegPid[%s]=%s\n",
+                           TheISA::IntRegIndexStr(src1) , _fetchArchRegsPid[src1]);
+                    return _fetchArchRegsPid[src1];
                 }
+                
 
                 continue;
-              }
+            //   }
           }
       }
 
       if (i >= numMicroops) {
-        return false;
+        return TheISA::PointerID(0);
       }
 
   }
-  return false;
+  return TheISA::PointerID(0);
 
 }
 
@@ -174,7 +177,7 @@ void MacroopBase::undoInjecttion(){
 
 
 void
-MacroopBase::injectBoundsCheck(PCState &nextPC){
+MacroopBase::injectBoundsCheck(PCState &nextPC, TheISA::PointerID _pid){
 
     // if there is a bounds check microop then no need to inject again
     // as in the IEW we will igonore it if it wasnt necessary
@@ -229,6 +232,8 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                         microops[idx]->getAddressSize(),
                         0)
                         );
+              
+              micro_0->setStaticPointerID(_pid);
               microopTemp[0] = micro_0;
 
               delete [] microops;
@@ -281,6 +286,7 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
                               microops[idx]->getAddressSize(),
                               0)
                               );
+                micro_0->setStaticPointerID(_pid);
                 microopTemp[0] = micro_0;
 
                 delete [] microops;
@@ -306,7 +312,9 @@ MacroopBase::injectBoundsCheck(PCState &nextPC){
 
 void
 MacroopBase::injectMicroops(ThreadContext * _tc,
-                            PCState &nextPC, TheISA::TyCHEAllocationPoint _sym)
+                            PCState &nextPC, 
+                            TheISA::TyCHEAllocationPoint _sym,
+                            TheISA::PointerID _pid)
 {
 
 
@@ -323,7 +331,7 @@ MacroopBase::injectMicroops(ThreadContext * _tc,
         injectAPFreeRet(_tc, nextPC);
       }
     else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT){
-        injectBoundsCheck(nextPC);
+        injectBoundsCheck(nextPC, _pid);
       }
     else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT){
         injectAPCallocBaseCollector(_tc, nextPC);

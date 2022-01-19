@@ -1270,14 +1270,13 @@ void
 DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
                                     ThreadID tid, StaticInstPtr& si) {
 
-
+        
         ThreadContext * tc = cpu->tcBase(tid);
         auto syms_it = (tc->syms_cache).find(thisPC.instAddr());
         if (syms_it != (tc->syms_cache).end()){
-            si->injectMicroops(tc, thisPC, syms_it->second);
+            si->injectMicroops(tc, thisPC, syms_it->second, TheISA::PointerID(0));
         }
         else {
-              //si->updatePointerTracker(tc,thisPC);
               // if this macroop is predicted to load a pointer
               //then we should not  this is a workaround for
               // a bug in squash method we check the bounds and permissions
@@ -1285,12 +1284,14 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               // Also, if the inject micro-op got committed, but the
               // load/store got squashed due to a memory order violation,
               // re-instrument the macro-op, but don't execute (just a nuance of gem5)
-              if (si->injectCheckMicroops(
-                    cpu->PointerDepGraph.getFetchArchRegsPidArray()) ||
-                  si->getNumOfMicroops() <= thisPC.microPC())
+              if (!InjectBoundsCheck(tc, thisPC)) return;
+              TheISA::PointerID pid = si->injectCheckMicroops(cpu->PointerDepGraph.getFetchArchRegsPidArray());
+              if (pid != TheISA::PointerID(0) /*|| si->getNumOfMicroops() <= thisPC.microPC()*/)
               {
-                  si->injectMicroops(tc, thisPC,
-                                   TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, -1));
+                  si->injectMicroops(tc, 
+                                   thisPC,
+                                   TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, -1),
+                                   pid);
               }
               else {
                 //check to see if there is injecteion from before
@@ -1308,15 +1309,16 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
 
 template<class Impl>
 bool
-DefaultFetch<Impl>::TrackAlias(ThreadContext * tc, TheISA::PCState &thisPC) {
+DefaultFetch<Impl>::TrackAlias(ThreadContext * tc, Addr pc_addr) {
 
     Block fake;
-    fake.payload = (Addr)thisPC.pc();
+    fake.payload = pc_addr;
     fake.req_szB = 1;
     UWord foundkey = 1;
     UWord foundval = 1;
     unsigned char found = VG_lookupFM(tc->FunctionSymbols,
                                     &foundkey, &foundval, (UWord)&fake );
+
     if (found)
     {
       return true;
@@ -1324,6 +1326,28 @@ DefaultFetch<Impl>::TrackAlias(ThreadContext * tc, TheISA::PCState &thisPC) {
     else
     {
       return false;
+    }
+}
+
+template<class Impl>
+bool
+DefaultFetch<Impl>::InjectBoundsCheck(ThreadContext * tc, TheISA::PCState &thisPC) {
+
+    Block fake;
+    fake.payload = (Addr)thisPC.pc();
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+                                    &foundkey, &foundval, (UWord)&fake );
+
+    if (found)
+    {
+      return false;
+    }
+    else
+    {
+      return true;
     }
 }
 
@@ -1535,7 +1559,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
 
 
             if (tc->enableCapability &&
-                TrackAlias(tc, thisPC))
+                TrackAlias(tc, thisPC.pc()))
             {
                 if (instruction->isMallocBaseCollectorMicroop() ||
                     instruction->isCallocBaseCollectorMicroop() ||

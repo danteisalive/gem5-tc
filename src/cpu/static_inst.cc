@@ -118,7 +118,8 @@ StaticInst::getMicroops() const
 void
 StaticInst::injectMicroops(ThreadContext * _tc,
                           TheISA::PCState &nextPC,
-                          TheISA::TyCHEAllocationPoint _sym){
+                          TheISA::TyCHEAllocationPoint _sym,
+                          TheISA::PointerID _pid){
 
     panic("injectMicroops: This should only be called by a macroop");
 }
@@ -141,7 +142,7 @@ StaticInst::updatePointerTracker(ThreadContext * tc, TheISA::PCState &nextPC){
     panic("updatePointerTracker: This should only be called by a macroop");
 }
 
-bool
+TheISA::PointerID
 StaticInst::injectCheckMicroops(
         std::array<TheISA::PointerID, TheISA::NumIntRegs> _fetchArchRegsPid)
 {

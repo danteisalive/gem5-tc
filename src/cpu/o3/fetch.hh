@@ -260,7 +260,7 @@ class DefaultFetch
 
     /** For priority-based fetch policies, need to keep update priorityList */
     void deactivateThread(ThreadID tid);
-  private:
+  public:
     /** Reset this pipeline stage */
     void resetStage();
 
@@ -285,7 +285,8 @@ class DefaultFetch
      */
     bool lookupAndUpdateNextPC(DynInstPtr &inst, TheISA::PCState &pc);
 
-    bool TrackAlias(ThreadContext * tc, TheISA::PCState &thisPC);
+    bool TrackAlias(ThreadContext * tc, Addr thisPC);
+    bool InjectBoundsCheck(ThreadContext * tc, TheISA::PCState &thisPC);
 
     void lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
                             ThreadID tid,
