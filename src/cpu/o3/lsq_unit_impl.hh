@@ -1536,6 +1536,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                   cpu->LVPTMissPredictP0ANPointerLowConfidence++;
 
                 inst->macroop->setMacroopPid(pid);
+                inst->staticInst->setStaticPointerID(pid);
+                inst->dyn_pid = pid;
                 return true;
 
             }
@@ -1543,24 +1545,26 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                      pid != TheISA::PointerID(0))
             {
                 DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PMAN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
-                    inst->pcState().instAddr(),
-                    inst->seqNum,
-                    inst->macroop->getMacroopPid(),
-                    pid);
-               cpu->PmAn++;
-               cpu->LVPTMissPredictPmAn++;
-               cpu->updateFetchLVPT(inst, pid,
-                                    inst->macroop->getMacroopPid(), false);
-               inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
+                        inst->pcState().instAddr(),
+                        inst->seqNum,
+                        inst->macroop->getMacroopPid(),
+                        pid);
+                cpu->PmAn++;
+                cpu->LVPTMissPredictPmAn++;
+                cpu->updateFetchLVPT(inst, pid,
+                                        inst->macroop->getMacroopPid(), false);
+                inst->MissPIDSquashType = Impl::MisspredictionType::PMAN;
 
-               if (inst->macroop->PredictionConfidenceLevel < 12)
-                 cpu->LVPTMissPredictPMANLowConfidence++;
+                if (inst->macroop->PredictionConfidenceLevel < 12)
+                    cpu->LVPTMissPredictPMANLowConfidence++;
 
-               if (inst->macroop->PredictionPointerRefillConfidence < 12)
-                 cpu->LVPTMissPredictPMANPointerLowConfidence++;
+                if (inst->macroop->PredictionPointerRefillConfidence < 12)
+                    cpu->LVPTMissPredictPMANPointerLowConfidence++;
 
-               inst->macroop->setMacroopPid(pid);
-               return true;
+                inst->macroop->setMacroopPid(pid);
+                inst->staticInst->setStaticPointerID(pid);
+                inst->dyn_pid = pid;
+                return true;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
@@ -1583,6 +1587,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                     cpu->LVPTMissPredictPNA0PointerLowConfidence++;
 
                 inst->macroop->setMacroopPid(pid);
+                inst->staticInst->setStaticPointerID(pid);
+                inst->dyn_pid = pid;
                 return true;
             }
 

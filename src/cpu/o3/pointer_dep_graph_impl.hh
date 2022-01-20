@@ -462,6 +462,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
         dependGraph[X86ISA::INTREG_RDI].push_front(
                                         PointerDepEntry(inst, inst->dyn_pid));
         //FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
+        inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
         DPRINTF(PointerDepGraph, "Free/Realloc is called! Invalidating PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
     }
