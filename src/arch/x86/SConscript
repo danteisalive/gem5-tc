@@ -71,6 +71,7 @@ if env['TARGET_ISA'] == 'x86':
     Source('tlb.cc')
     Source('types.cc')
     Source('utility.cc')
+    Source('TypeNode.cc')
     Source('vtophys.cc')
     Source('insts/macroop.cc')
     SimObject('X86ISA.py')
