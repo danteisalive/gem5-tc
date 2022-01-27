@@ -130,6 +130,7 @@ class ObjectFile
 
     bool loadSection(Section *sec, PortProxy& mem_proxy, Addr mask,
                      Addr offset = 0);
+    bool loadSection(Section *sec, Addr addr_mask = maxAddr, Addr offset = 0);
     void setGlobalPointer(Addr global_ptr) { globalPtr = global_ptr; }
 
   public:

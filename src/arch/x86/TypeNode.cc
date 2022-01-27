@@ -61,6 +61,137 @@
 namespace X86ISA {
 
 
+
+bool readVirtualTable(const char* file_name, ThreadContext *tc)
+{
+
+    Elf         *elf;
+    Elf_Scn     *scn = NULL;
+    GElf_Shdr   shdr;
+    Elf_Data    *data;
+    int         fd, ii, count;
+    Elf64_Ehdr	*ehdr = NULL;
+    std::map<int, Elf64_Word>  shs_flags;
+    elf_version(EV_CURRENT);
+
+    fd = open(file_name, O_RDONLY);
+    panic_if(fd == -1, "readSymTab: Can't open file: %s! Error Number % d\n", std::string(file_name), errno);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    //   std::cout << "readSymTab : " << std::string(file_name) << std::endl;
+    assert (elf != NULL);
+
+    int i = 0;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        gelf_getshdr(scn, &shdr);
+        shs_flags[i] = shdr.sh_flags;
+        //printf("sh_number: %d sh_flags: %lu\n", i, shdr.sh_flags);
+        i++;
+    }
+
+    
+    ehdr = elf64_getehdr(elf);
+    assert (elf != NULL);
+    if (shs_flags.size() > ehdr->e_shnum){
+        panic("invalid number of section headers!");
+    }
+
+
+    scn = NULL;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        gelf_getshdr(scn, &shdr);
+        if (shdr.sh_type == SHT_SYMTAB) {
+            /* found a symbol table, go print it. */
+            break;
+        }
+    }
+
+    if (scn == NULL){
+        panic("didn't found a symbol table!");
+        return false;
+    }
+
+
+    data = elf_getdata(scn, NULL);
+    count = shdr.sh_size / shdr.sh_entsize;
+
+    std::map<Elf64_Addr, std::string> sym_name;
+    std::map<Elf64_Addr, unsigned char> sym_info;
+    std::map<Elf64_Addr, Elf64_Xword> sym_size;
+    std::map<Elf64_Addr, Elf64_Half> sym_shndx;
+
+
+    /* print the symbol names */
+    for (ii = 0; ii < count; ++ii) 
+    {
+        GElf_Sym sym;
+        gelf_getsym(data, ii, &sym);
+
+        // read all the symbols
+        if (sym.st_value != 0)
+        {
+            
+            const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
+            std::string s1(pStr);
+
+            if (s1.find("_ZTV", 0) != 0) continue;
+
+            panic_if(sym_name.find(sym.st_value) != sym_name.end(), "duplicate sym_name! %x\n", sym.st_value);
+            panic_if(sym_info.find(sym.st_value) != sym_info.end(), "duplicate sym_info!\n");
+            panic_if(!sym.st_size, "VPTR sym size is 0! %x\n", sym.st_value);
+            panic_if(sym_size.find(sym.st_value) != sym_size.end(), "duplicate sym_size!\n");
+
+
+            sym_name[sym.st_value] = s1;
+            sym_info[sym.st_value] = sym.st_info;
+            sym_size[sym.st_value] = sym.st_size;
+            sym_shndx[sym.st_value] = sym.st_shndx;
+        }
+
+    }
+    elf_end(elf);
+    close(fd);
+
+    // now read the content of the virtual tables
+    ObjectFile *lib = createObjectFile(file_name); 
+
+    ElfObject *elf_obj = dynamic_cast<ElfObject*>(lib);
+
+    assert(elf_obj && "ElfObject is null!\n");
+
+    // extract all the vtables
+    for (auto &symbol : sym_name)
+    {
+        int status = 0;
+    
+        char *res = abi::__cxa_demangle(symbol.second.c_str(), NULL, NULL, &status);
+        if (status != 0) {
+            continue;
+        }
+        std::string demangled_name = std::string(res);
+        if (demangled_name.find("vtable for ") != std::string::npos)
+        {
+            DPRINTF(TypeMetadata, "Symbol Addr: %x Symbol: %s Demangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
+                      symbol.first, symbol.second, demangled_name, sym_size[symbol.first], sym_info[symbol.first], sym_shndx[symbol.first]);
+            elf_obj->readSectionData((int)sym_shndx[symbol.first]);
+            free(res);
+        }
+        else 
+        {
+            DPRINTF(TypeMetadata, "Symbol: %s\n", symbol.second);
+            assert("A symbole that starts with _ZTV!\n");
+        }
+    }
+
+
+
+
+
+
+    return false;
+}
+
+
+
 void retreiveEffInfosFromFile(const std::string HashFileName, 
                             std::map<std::string, my_effective_info>& EffInfos) {
     

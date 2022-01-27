@@ -117,7 +117,7 @@ X86Process::X86Process(ProcessParams *params, ObjectFile *objFile,
       syscallDescs(_syscallDescs), numSyscallDescs(_numSyscallDescs)
 {
 
-    std::cout << "X86Process::X86Process::params->useArchPT: " << params->useArchPT << std::endl; 
+    //std::cout << "X86Process::X86Process::params->useArchPT: " << params->useArchPT << std::endl; 
 }
 
 void X86Process::clone(ThreadContext *old_tc, ThreadContext *new_tc,

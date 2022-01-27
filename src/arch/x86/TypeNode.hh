@@ -57,6 +57,22 @@
 #include <queue>
 #include <boost/algorithm/string.hpp>
 
+#include <fcntl.h>
+#include <gelf.h>
+#include <libelf.h>
+#include <unistd.h>
+
+#include <fstream>
+
+#include "cpu/simple/WordFM.hh"
+#include "cpu/static_inst.hh"
+#include "cpu/thread_context.hh"
+#include "mem/page_table.hh"
+#include "sim/full_system.hh"
+#include "sim/process.hh"
+#include "debug/TypeMetadata.hh"
+#include "base/loader/object_file.hh"
+#include "base/loader/elf_object.hh"
 
 namespace X86ISA
 {
@@ -204,8 +220,13 @@ void buildTypeTree(my_effective_info ei,
                   std::map<int, std::map<int, std::set<std::pair<int, int>>>>& typeTree);
 
 void retreiveEffInfosFromFile(const std::string HashFileName, 
-                            std::map<std::string, my_effective_info>& EffInfos);                
+                            std::map<std::string, my_effective_info>& EffInfos);        
+
+bool readVirtualTable(const char* file_name, ThreadContext *tc);        
 
 }
+
+
+
 
 #endif // 

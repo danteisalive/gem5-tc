@@ -552,6 +552,64 @@ ElfObject::getSections()
     elf_end(elf);
 }
 
+bool 
+ElfObject::readSectionData(int sec_idx, Addr addr_mask, Addr offset)
+{
+    // get a pointer to elf structure
+    Elf *elf = elf_memory((char*)fileData,len);
+    assert(elf != NULL);
+
+    Elf_Scn *section = elf_getscn(elf, sec_idx);
+    assert(section && "Section is empty!\n");
+
+    GElf_Shdr shdr;
+    gelf_getshdr(section, &shdr);
+    Addr sec_start = shdr.sh_addr;
+
+
+    // Check that we actually have a elf file
+    GElf_Ehdr ehdr;
+    if (gelf_getehdr(elf, &ehdr) == 0) {
+        panic("Not ELF, shouldn't be here");
+    }
+
+    Section sec;
+
+
+    for (int i = 0; i < ehdr.e_phnum; ++i) {
+        GElf_Phdr phdr;
+        if (gelf_getphdr(elf, i, &phdr) == 0) {
+            panic("gelf_getphdr failed for segment %d.", i);
+        }
+
+        // for now we don't care about non-loadable segments
+        if (!(phdr.p_type & PT_LOAD))
+            continue;
+
+        // Check to see if this is the text or data segment
+        if (phdr.p_vaddr <= sec_start &&
+                phdr.p_vaddr + phdr.p_filesz > sec_start) 
+        {
+            // If this value is nonzero, we need to flip the relocate flag.
+            if (phdr.p_vaddr != 0)
+                relocate = false;
+
+            sec.baseAddr = phdr.p_paddr;
+            sec.size = phdr.p_filesz;
+            sec.fileImage = fileData + phdr.p_offset;
+            DPRINTF(TypeMetadata, "FOUND IT!\n");
+        }
+
+    }
+
+
+
+    if (!ObjectFile::loadSection(&sec, addr_mask, offset))
+        return false;
+
+    return true;
+}
+
 bool
 ElfObject::sectionExists(std::string sec)
 {
