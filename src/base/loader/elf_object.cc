@@ -552,6 +552,43 @@ ElfObject::getSections()
     elf_end(elf);
 }
 
+std::string 
+ElfObject::extractSymbolName(Elf64_Addr sym_value)
+{
+
+    Elf *elf = elf_memory((char*)fileData, len);
+    assert(elf != NULL);
+    assert(obj_sym_names.size());
+    assert(obj_sym_infos.size());
+    assert(obj_sym_shndxs.size());
+    assert(obj_sym_sizes.size());
+    // look into sym_shndx to find the sec_idx of the symbol
+    if (sym_value == 0 || 
+        obj_sym_shndxs.find(sym_value) == obj_sym_shndxs.end())
+    {
+        DPRINTF(TypeMetadata, "Symbol Addr: %x Demangled Symbol: Empty!\n",sym_value);
+        return "";
+    }
+        
+    
+    int status = 0;
+    
+    char *res = abi::__cxa_demangle(obj_sym_names[sym_value].c_str(), NULL, NULL, &status);
+    if (status != 0) {
+        return "";
+    }
+    
+    std::string demangled_name = std::string(res);
+
+        
+    DPRINTF(TypeMetadata, "Symbol Addr: %x Mangled Symbol: %s Demangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
+                        sym_value, obj_sym_names[sym_value], demangled_name, obj_sym_sizes[sym_value], obj_sym_infos[sym_value], obj_sym_shndxs[sym_value]);
+    free(res);
+    
+    return demangled_name;
+
+}
+
 bool 
 ElfObject::readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_size, Addr addr_mask, Addr offset)
 {
@@ -574,9 +611,8 @@ ElfObject::readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_si
     }
 
 
-    // Elf_Data * data = elf_getdata(section, NULL);
-    
-    Section sec;
+
+
     for (int i = 0; i < ehdr.e_phnum; ++i) {
         GElf_Phdr phdr;
         if (gelf_getphdr(elf, i, &phdr) == 0) {
@@ -591,32 +627,29 @@ ElfObject::readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_si
         if (phdr.p_vaddr <= sec_start &&
                 phdr.p_vaddr + phdr.p_filesz > sec_start) 
         {
-            // If this value is nonzero, we need to flip the relocate flag.
-            // if (phdr.p_vaddr != 0)
-            //     assert(false && "What is this?\n");
-
-            sec.baseAddr = phdr.p_paddr;
-            sec.size = phdr.p_filesz;
-            sec.fileImage = fileData + phdr.p_offset;
-            sec = sec;
             DPRINTF(TypeMetadata, "sec start: %x sym_value: %x phdr.p_paddr: %x phdr.p_vaddr: %x phdr.p_memsz: %x phdr.p_offset: %x phdr.p_filesz: %x!\n", 
                     sec_start, sym_value, phdr.p_paddr, phdr.p_vaddr, phdr.p_memsz, phdr.p_offset, phdr.p_filesz);
 
-            char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+            char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
             // refer to this:
             // https://stackoverflow.com/questions/64760653/how-do-i-dump-the-contents-of-an-elf-file-at-a-specific-address
             char * data = (char*)(fileData  + phdr.p_offset + (sym_value - phdr.p_paddr));
-            std::string str = "";
-            for( int i = 0; i < sym_size; i++)
+            
+            for( int i = 0; i < sym_size; i = i + 8)
             {
-                char const byte = data[i];
+                std::string str = "";
+                for (int ii = 7; ii >= 0; ii--)
+                {
+                    char const byte = data[i+ii];
 
-                str += hex_chars[ ( byte & 0xF0 ) >> 4 ];
-                str += hex_chars[ ( byte & 0x0F ) >> 0 ];
+                    str += hex_chars[ ( byte & 0xF0 ) >> 4 ];
+                    str += hex_chars[ ( byte & 0x0F ) >> 0 ];
+                }
+                Elf64_Addr x = (Elf64_Addr) std::stoull(str, nullptr, 16);
+                //DPRINTF(TypeMetadata, "Symbol Addr: 0x%x\n", x);
+                extractSymbolName(x);
+
             }
-            DPRINTF(TypeMetadata, "DUMP: %s\n", str);
-            // if (!ObjectFile::loadSection(&sec))
-            //     assert(false && "What is this?!\n");
         
         }
 

@@ -47,8 +47,13 @@
 #include <vector>
 #include <gelf.h>
 #include <libelf.h>
+#include <map>
 #include "base/loader/object_file.hh"
 #include "debug/TypeMetadata.hh"
+
+#include <boost/algorithm/string.hpp>
+
+
 
 class ElfObject : public ObjectFile
 {
@@ -94,6 +99,12 @@ class ElfObject : public ObjectFile
     std::vector<Segment> extraSegments;
 
   public:
+
+    std::map<Elf64_Addr, std::string> obj_sym_names;
+    std::map<Elf64_Addr, unsigned char> obj_sym_infos;
+    std::map<Elf64_Addr, Elf64_Xword> obj_sym_sizes;
+    std::map<Elf64_Addr, Elf64_Half> obj_sym_shndxs;
+
     virtual ~ElfObject() {}
 
     bool loadSections(PortProxy& mem_proxy, Addr addr_mask = maxAddr,
@@ -125,7 +136,9 @@ class ElfObject : public ObjectFile
 
     virtual bool hasTLS() override { return sectionExists(".tbss"); }
 
-    bool readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_size, Addr addr_mask = maxAddr, Addr offset = 0);
+    bool readSectionData(int sec_idx, Elf64_Addr sym_value, 
+                        Elf64_Xword sym_size, Addr addr_mask = maxAddr, Addr offset = 0);
+    std::string extractSymbolName(Elf64_Addr sym_value);
     static ObjectFile *tryFile(const std::string &fname,
                                size_t len, uint8_t *data,
                                bool skip_interp_check = false);

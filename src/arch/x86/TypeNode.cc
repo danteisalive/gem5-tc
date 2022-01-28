@@ -120,6 +120,11 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
     std::map<Elf64_Addr, Elf64_Half> sym_shndx;
 
 
+    // now read the content of the virtual tables
+    ObjectFile *lib = createObjectFile(file_name); 
+
+    ElfObject *elf_obj = dynamic_cast<ElfObject*>(lib);
+
     /* print the symbol names */
     for (ii = 0; ii < count; ++ii) 
     {
@@ -129,9 +134,16 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
         // read all the symbols
         if (sym.st_value != 0)
         {
-            
+
+
+
             const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
             std::string s1(pStr);
+
+            elf_obj->obj_sym_infos[sym.st_value] = sym.st_info;
+            elf_obj->obj_sym_names[sym.st_value] = s1;
+            elf_obj->obj_sym_shndxs[sym.st_value] = sym.st_shndx;
+            elf_obj->obj_sym_sizes[sym.st_value] = sym.st_size;
 
             if (s1.find("_ZTV", 0) != 0) continue;
 
@@ -140,6 +152,8 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
             panic_if(!sym.st_size, "VPTR sym size is 0! %x\n", sym.st_value);
             panic_if(sym_size.find(sym.st_value) != sym_size.end(), "duplicate sym_size!\n");
 
+            DPRINTF(TypeMetadata, "VTable Symbol Addr: %x Mangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
+                        sym.st_value, s1, sym.st_size, sym.st_info, sym.st_shndx);
 
             sym_name[sym.st_value] = s1;
             sym_info[sym.st_value] = sym.st_info;
@@ -151,12 +165,14 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
     elf_end(elf);
     close(fd);
 
-    // now read the content of the virtual tables
-    ObjectFile *lib = createObjectFile(file_name); 
 
-    ElfObject *elf_obj = dynamic_cast<ElfObject*>(lib);
-
+    DPRINTF(TypeMetadata, "\n\n");
     assert(elf_obj && "ElfObject is null!\n");
+    assert(sym_info.size());
+    assert(sym_name.size());
+    assert(sym_shndx.size());
+    assert(sym_size.size());
+
 
     // extract all the vtables
     for (auto &symbol : sym_name)
