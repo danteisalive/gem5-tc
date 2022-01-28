@@ -45,7 +45,8 @@
 
 #include <set>
 #include <vector>
-
+#include <gelf.h>
+#include <libelf.h>
 #include "base/loader/object_file.hh"
 #include "debug/TypeMetadata.hh"
 
@@ -124,7 +125,7 @@ class ElfObject : public ObjectFile
 
     virtual bool hasTLS() override { return sectionExists(".tbss"); }
 
-    bool readSectionData(int sec_idx, Addr addr_mask = maxAddr, Addr offset = 0);
+    bool readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_size, Addr addr_mask = maxAddr, Addr offset = 0);
     static ObjectFile *tryFile(const std::string &fname,
                                size_t len, uint8_t *data,
                                bool skip_interp_check = false);

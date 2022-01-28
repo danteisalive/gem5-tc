@@ -553,7 +553,7 @@ ElfObject::getSections()
 }
 
 bool 
-ElfObject::readSectionData(int sec_idx, Addr addr_mask, Addr offset)
+ElfObject::readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_size, Addr addr_mask, Addr offset)
 {
     // get a pointer to elf structure
     Elf *elf = elf_memory((char*)fileData,len);
@@ -573,9 +573,10 @@ ElfObject::readSectionData(int sec_idx, Addr addr_mask, Addr offset)
         panic("Not ELF, shouldn't be here");
     }
 
+
+    // Elf_Data * data = elf_getdata(section, NULL);
+    
     Section sec;
-
-
     for (int i = 0; i < ehdr.e_phnum; ++i) {
         GElf_Phdr phdr;
         if (gelf_getphdr(elf, i, &phdr) == 0) {
@@ -586,26 +587,41 @@ ElfObject::readSectionData(int sec_idx, Addr addr_mask, Addr offset)
         if (!(phdr.p_type & PT_LOAD))
             continue;
 
-        // Check to see if this is the text or data segment
+        // Check to see if this is the segment that we are looking for
         if (phdr.p_vaddr <= sec_start &&
                 phdr.p_vaddr + phdr.p_filesz > sec_start) 
         {
             // If this value is nonzero, we need to flip the relocate flag.
-            if (phdr.p_vaddr != 0)
-                relocate = false;
+            // if (phdr.p_vaddr != 0)
+            //     assert(false && "What is this?\n");
 
             sec.baseAddr = phdr.p_paddr;
             sec.size = phdr.p_filesz;
             sec.fileImage = fileData + phdr.p_offset;
-            DPRINTF(TypeMetadata, "FOUND IT!\n");
+            sec = sec;
+            DPRINTF(TypeMetadata, "sec start: %x sym_value: %x phdr.p_paddr: %x phdr.p_vaddr: %x phdr.p_memsz: %x phdr.p_offset: %x phdr.p_filesz: %x!\n", 
+                    sec_start, sym_value, phdr.p_paddr, phdr.p_vaddr, phdr.p_memsz, phdr.p_offset, phdr.p_filesz);
+
+            char const hex_chars[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+            // refer to this:
+            // https://stackoverflow.com/questions/64760653/how-do-i-dump-the-contents-of-an-elf-file-at-a-specific-address
+            char * data = (char*)(fileData  + phdr.p_offset + (sym_value - phdr.p_paddr));
+            std::string str = "";
+            for( int i = 0; i < sym_size; i++)
+            {
+                char const byte = data[i];
+
+                str += hex_chars[ ( byte & 0xF0 ) >> 4 ];
+                str += hex_chars[ ( byte & 0x0F ) >> 0 ];
+            }
+            DPRINTF(TypeMetadata, "DUMP: %s\n", str);
+            // if (!ObjectFile::loadSection(&sec))
+            //     assert(false && "What is this?!\n");
+        
         }
 
     }
-
-
-
-    if (!ObjectFile::loadSection(&sec, addr_mask, offset))
-        return false;
+    
 
     return true;
 }

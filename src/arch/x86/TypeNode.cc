@@ -172,7 +172,7 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
         {
             DPRINTF(TypeMetadata, "Symbol Addr: %x Symbol: %s Demangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
                       symbol.first, symbol.second, demangled_name, sym_size[symbol.first], sym_info[symbol.first], sym_shndx[symbol.first]);
-            elf_obj->readSectionData((int)sym_shndx[symbol.first]);
+            elf_obj->readSectionData((int)sym_shndx[symbol.first], symbol.first, sym_size[symbol.first]);
             free(res);
         }
         else 
