@@ -563,19 +563,26 @@ ElfObject::extractSymbolName(Elf64_Addr sym_value)
     assert(obj_sym_shndxs.size());
     assert(obj_sym_sizes.size());
     // look into sym_shndx to find the sec_idx of the symbol
-    if (sym_value == 0 || 
-        obj_sym_shndxs.find(sym_value) == obj_sym_shndxs.end())
+    if (sym_value == 0)
     {
-        DPRINTF(TypeMetadata, "Symbol Addr: %x Demangled Symbol: Empty!\n",sym_value);
-        return "";
+        DPRINTF(TypeMetadata, "Symbol Addr: %x Demangled Symbol: Empty!\n", sym_value);
+        return "0x00000000";
     }
-        
+
+    if (obj_sym_names.find(sym_value) == obj_sym_names.end())
+    {
+        DPRINTF(TypeMetadata, "Symbol Addr: %x Demangled Symbol: Empty!\n", sym_value);
+        std::stringstream stream;
+        stream << std::hex << "0x" << sym_value;
+        std::string result( stream.str() );
+        return result;
+    }
     
     int status = 0;
     
     char *res = abi::__cxa_demangle(obj_sym_names[sym_value].c_str(), NULL, NULL, &status);
     if (status != 0) {
-        return "";
+        return obj_sym_names[sym_value];
     }
     
     std::string demangled_name = std::string(res);
@@ -646,15 +653,79 @@ ElfObject::readSectionData(int sec_idx, Elf64_Addr sym_value, Elf64_Xword sym_si
                     str += hex_chars[ ( byte & 0x0F ) >> 0 ];
                 }
                 Elf64_Addr x = (Elf64_Addr) std::stoull(str, nullptr, 16);
-                //DPRINTF(TypeMetadata, "Symbol Addr: 0x%x\n", x);
-                extractSymbolName(x);
+                //DPRINTF(TypeMetadata, "Symbol Addr: %x\n", x);
+                std::string entry = extractSymbolName(x);
+                virtual_tables[sym_value].push_back(entry);
 
             }
         
         }
 
     }
+
+    assert(virtual_tables.find(sym_value) != virtual_tables.end() && 
+          "Cannot find the extracted virtual table for symbol!\n");
+
+    // dump the extracted virtual table
+    for(auto &elem : virtual_tables[sym_value])
+    {
+        DPRINTF(TypeMetadata, "VT Entry: %s\n", elem);
+    }
+    // if (!verifyExtractedVirtualTable(virtual_tables[sym_value]))
+    // {
+    //     panic("Cannot verify the sanity of the extracted symbol table!\n");
+    // }
     
+    
+
+    return true;
+}
+
+bool 
+ElfObject::verifyExtractedVirtualTable(const std::vector<std::string> vt)
+{
+    // A virtual table has this layout:
+    /*
+       OFFSET
+       TYPEINFO
+       FUNC1
+       FUNC2
+       ....
+       OFFSET
+       TYPEINFO
+       FUNCn1
+       FUNCn2
+    */ 
+    // therefore after every offset there should be a typeinfo!
+
+    bool is_offset_field  = false;
+    for (auto elem: vt)
+    {
+        if (elem == "")
+        {
+            if (is_offset_field) {return false;}
+
+            is_offset_field = true;
+        }
+        else if (elem.find("typeinfo for ") != std::string::npos)
+        {
+            size_t loc = (elem.find("typeinfo for "));
+            if (loc != 0) {std::cout << "LOC: " << elem << " " << loc << std::endl;  return false;}
+            if (!is_offset_field) { return false;}
+
+            is_offset_field = false;
+        }
+        else if (elem == "__cxa_pure_virtual")
+        {
+            if (is_offset_field) { return false;}
+            continue;
+        }
+        else 
+        {
+            if (is_offset_field) { return false;}
+            continue;
+        }
+    }
 
     return true;
 }

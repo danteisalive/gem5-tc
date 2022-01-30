@@ -28,32 +28,4 @@ Checking whether __i386__ is declared... (cached) no
 Checking whether __x86_64__ is declared... (cached) yes
 Building in /home/dante/gem5-tc/build/X86
 Using saved variables file /home/dante/gem5-tc/build/variables/X86
-scons: done reading SConscript files.
-scons: Building targets ...
- [     CXX] X86/cpu/o3/probe/simple_trace.cc -> .o
- [VER TAGS]  -> X86/sim/tags.cc
- [     CXX] X86/python/_m5/param_DerivO3CPU.cc -> .o
- [     CXX] X86/python/_m5/param_O3Checker.cc -> .o
- [     CXX] X86/python/_m5/param_SimpleTrace.cc -> .o
- [     CXX] X86/cpu/o3/base_dyn_inst.cc -> .o
- [     CXX] X86/cpu/o3/commit.cc -> .o
- [    LINK]  -> X86/sim/power/lib.o.partial
- [     CXX] X86/cpu/o3/cpu.cc -> .o
- [     CXX] X86/cpu/o3/deriv.cc -> .o
- [     CXX] X86/cpu/o3/decode.cc -> .o
- [     CXX] X86/cpu/o3/dyn_inst.cc -> .o
- [     CXX] X86/cpu/o3/fetch.cc -> .o
- [     CXX] X86/cpu/o3/iew.cc -> .o
- [     CXX] X86/cpu/o3/inst_queue.cc -> .o
- [     CXX] X86/cpu/o3/lsq.cc -> .o
- [     CXX] X86/cpu/o3/lsq_unit.cc -> .o
- [     CXX] X86/cpu/o3/mem_dep_unit.cc -> .o
- [     CXX] X86/cpu/o3/rename.cc -> .o
- [     CXX] X86/cpu/o3/rob.cc -> .o
- [     CXX] X86/cpu/o3/thread_context.cc -> .o
- [     CXX] X86/cpu/o3/pointer_dep_graph.cc -> .o
- [     CXX] X86/cpu/o3/checker.cc -> .o
- [    LINK]  -> X86/cpu/o3/lib.o.partial
- [     CXX] X86/base/date.cc -> .o
- [    LINK]  -> X86/gem5.opt
-scons: done building targets.
+scons: Build interrupted.

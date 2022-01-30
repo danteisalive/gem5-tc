@@ -70,6 +70,10 @@ class ElfObject : public ObjectFile
 
     ElfObject *interpreter;
 
+    std::map<Elf64_Addr, std::vector<std::string>> virtual_tables; 
+
+    bool verifyExtractedVirtualTable(const std::vector<std::string> vt);
+
     // An interpreter load bias is the location in the process address space
     // where the interpreter is chosen to reside. Typically, this is carved
     // out of the top of the mmap reserve section.
@@ -104,6 +108,8 @@ class ElfObject : public ObjectFile
     std::map<Elf64_Addr, unsigned char> obj_sym_infos;
     std::map<Elf64_Addr, Elf64_Xword> obj_sym_sizes;
     std::map<Elf64_Addr, Elf64_Half> obj_sym_shndxs;
+
+
 
     virtual ~ElfObject() {}
 

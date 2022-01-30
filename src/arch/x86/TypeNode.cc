@@ -135,15 +135,13 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
         if (sym.st_value != 0)
         {
 
-
-
             const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
             std::string s1(pStr);
 
-            elf_obj->obj_sym_infos[sym.st_value] = sym.st_info;
-            elf_obj->obj_sym_names[sym.st_value] = s1;
-            elf_obj->obj_sym_shndxs[sym.st_value] = sym.st_shndx;
-            elf_obj->obj_sym_sizes[sym.st_value] = sym.st_size;
+            elf_obj->obj_sym_infos[sym.st_value]    = sym.st_info;
+            elf_obj->obj_sym_names[sym.st_value]    = s1;
+            elf_obj->obj_sym_shndxs[sym.st_value]   = sym.st_shndx;
+            elf_obj->obj_sym_sizes[sym.st_value]    = sym.st_size;
 
             if (s1.find("_ZTV", 0) != 0) continue;
 
@@ -197,11 +195,6 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
             assert("A symbole that starts with _ZTV!\n");
         }
     }
-
-
-
-
-
 
     return false;
 }
