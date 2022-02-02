@@ -63,6 +63,9 @@
 #include <unistd.h>
 
 #include <fstream>
+#include <sstream>
+#include <string>
+#include <map>
 
 #include "cpu/simple/WordFM.hh"
 #include "cpu/static_inst.hh"
@@ -73,6 +76,7 @@
 #include "debug/TypeMetadata.hh"
 #include "base/loader/object_file.hh"
 #include "base/loader/elf_object.hh"
+
 
 namespace X86ISA
 {
@@ -88,6 +92,66 @@ namespace X86ISA
 
 #define EFFECTIVE_COERCED_INT32_HASH    0x51A0B9BF4F692902ull   // Random
 #define EFFECTIVE_COERCED_INT8_PTR_HASH 0x2317E969C295951Dull   // Random
+
+struct TypeEntryInfo
+{
+    bool        Valid;
+    bool        Coerced;
+    uint64_t    LowerBound;
+    uint64_t    UpperBound;
+    bool        FlexibleMemberArray;
+    std::string Name;
+    bool        VirtualTablePointer;
+    std::string MetaType;
+    std::string ParentType;
+
+    TypeEntryInfo(
+        bool        c, 
+        uint64_t    lb,
+        uint64_t    ub,
+        bool        fma,
+        std::string name,
+        bool        vtpr,
+        std::string meta_type,
+        std::string parent_type
+    )
+    {
+        Valid = true;
+        Coerced = c;
+        LowerBound = lb;
+        UpperBound = ub;
+        FlexibleMemberArray = fma;
+        Name = name;
+        VirtualTablePointer = vtpr;
+        MetaType = meta_type;
+        ParentType = parent_type;
+    }
+
+    TypeEntryInfo()
+    {
+        Valid = false;
+        Coerced = false;
+        LowerBound = 0;
+        UpperBound = 0;
+        FlexibleMemberArray = false;
+        Name = "";
+        VirtualTablePointer = false;
+        MetaType = "";
+        ParentType = "";
+    }
+};
+typedef struct TypeEntryInfo TypeEntryInfo;
+
+
+struct TypeMetadataInfo 
+{
+    std::string FileName;
+    uint64_t AllocationPointSize;
+    std::multimap<uint64_t, TypeEntryInfo> TypeEntrys;
+
+};
+typedef struct TypeMetadataInfo TypeMetadataInfo;
+
 
 struct my_effective_info_entry {
     std::string global_name;
@@ -222,7 +286,10 @@ void buildTypeTree(my_effective_info ei,
 void retreiveEffInfosFromFile(const std::string HashFileName, 
                             std::map<std::string, my_effective_info>& EffInfos);        
 
-bool readVirtualTable(const char* file_name, ThreadContext *tc);        
+bool readVirtualTable(const char* file_name, ThreadContext *tc);  
+
+bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc);
+bool readTypeMetadata(const char* file_name, ThreadContext *tc);
 
 }
 

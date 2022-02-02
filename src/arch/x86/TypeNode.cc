@@ -61,6 +61,198 @@
 namespace X86ISA {
 
 
+bool readTypeMetadata(const char* file_name, ThreadContext *tc)
+{
+
+    std::ifstream input(file_name);
+    
+    std::string FILENAME = "";
+    std::string APSIZE = "";
+    std::string OFFSET = "";
+    std::string CORECED = "";
+    std::string LB = "";
+    std::string UB = "";
+    std::string FAM = "";
+    std::string NAME = "";
+    std::string VPTR = "";
+    std::string METATYPE = "";
+    std::string PARENT = "";
+
+
+    std::string line;
+    while (std::getline(input, line))
+    {
+        std::istringstream iss(line);
+        std::string key, answer;
+        iss >> key;
+
+        // DPRINTF(TypeMetadata, "KEY: %s\n", key);
+        // DPRINTF(TypeMetadata, "RAW: %s\n", line);
+        if (key == "FILENAME") 
+        {
+            answer = line.substr(10, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else if (key == "APSIZE") 
+        {
+            answer = line.substr(7, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else if (key == "OFFSET") 
+        {
+            answer = line.substr(7, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else if (key == "CORECED") 
+        {
+            answer = line.substr(8, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else if (key == "LB") 
+        {
+            answer = line.substr(3, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else if (key == "UB") 
+        {
+            answer = line.substr(3, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else if (key == "FAM") 
+        {
+            answer = line.substr(4, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        } 
+        else if (key == "NAME") 
+        {
+            answer = line.substr(5, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        } 
+        else if (key == "VPTR") 
+        {
+            answer = line.substr(5, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        } 
+        else if (key == "METATYPE") 
+        {
+            answer = line.substr(9, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        } 
+        else if (key == "PARENTTYPE") 
+        {
+            answer = line.substr(11, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+        }
+        else
+        {
+            DPRINTF(TypeMetadata, "Can't find any key: %s\n", key); 
+        }
+    }
+
+    return true;
+}
+
+bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
+{
+    Elf         *elf;
+    Elf_Scn     *scn = NULL;
+    GElf_Shdr   shdr;
+    Elf_Data    *data;
+    int         fd, ii, count;
+    Elf64_Ehdr	*ehdr = NULL;
+    std::map<int, Elf64_Word>  shs_flags;
+    elf_version(EV_CURRENT);
+
+    fd = open(file_name, O_RDONLY);
+    panic_if(fd == -1, "readSymTab: Can't open file: %s! Error Number % d\n", std::string(file_name), errno);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    //   std::cout << "readSymTab : " << std::string(file_name) << std::endl;
+    assert (elf != NULL);
+
+    int i = 0;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        gelf_getshdr(scn, &shdr);
+        shs_flags[i] = shdr.sh_flags;
+        //printf("sh_number: %d sh_flags: %lu\n", i, shdr.sh_flags);
+        i++;
+    }
+
+    
+    ehdr = elf64_getehdr(elf);
+    assert (elf != NULL);
+    if (shs_flags.size() > ehdr->e_shnum){
+        panic("invalid number of section headers!");
+    }
+
+
+    scn = NULL;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        gelf_getshdr(scn, &shdr);
+        if (shdr.sh_type == SHT_SYMTAB) {
+            /* found a symbol table, go print it. */
+            break;
+        }
+    }
+
+    if (scn == NULL){
+        panic("didn't found a symbol table!");
+        return false;
+    }
+
+
+    data = elf_getdata(scn, NULL);
+    count = shdr.sh_size / shdr.sh_entsize;
+
+    std::map<Elf64_Addr, std::string> sym_name;
+    std::map<Elf64_Addr, unsigned char> sym_info;
+    std::map<Elf64_Addr, Elf64_Xword> sym_size;
+    std::map<Elf64_Addr, Elf64_Half> sym_shndx;
+
+    /* print the symbol names */
+    for (ii = 0; ii < count; ++ii) 
+    {
+        GElf_Sym sym;
+        gelf_getsym(data, ii, &sym);
+
+        const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
+        std::string s1(pStr);
+
+
+
+        size_t loc = 0;
+        loc = s1.find("TYCHE_TYCHE_SYMS#", 0);
+        if (loc == std::string::npos) continue;
+
+        DPRINTF(TypeMetadata, "TYCHE Symbol Addr: %x Mangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
+                        sym.st_value, s1, sym.st_size, sym.st_info, sym.st_shndx);
+
+        assert(loc == 0 && "Found a TYCHE symbol with strange name!\n"); 
+        assert(sym.st_value != 0 && "Found a TYCHE symbol with value of 0!\n");
+        assert(sym.st_size == 0 && "TYCHE sym size is not 0!\n");
+
+        panic_if(sym_name.find(sym.st_value) != sym_name.end(), "duplicate sym_name! %x\n", sym.st_value);
+        panic_if(sym_info.find(sym.st_value) != sym_info.end(), "duplicate sym_info!\n");
+        panic_if(sym_size.find(sym.st_value) != sym_size.end(), "duplicate sym_size!\n");
+
+
+
+        sym_name[sym.st_value] = s1;
+        sym_info[sym.st_value] = sym.st_info;
+        sym_size[sym.st_value] = sym.st_size;
+        sym_shndx[sym.st_value] = sym.st_shndx;
+    }
+
+    
+    elf_end(elf);
+    close(fd);
+
+    assert(sym_info.size());
+    assert(sym_name.size());
+    assert(sym_shndx.size());
+    assert(sym_size.size());
+
+    return true;
+}
 
 bool readVirtualTable(const char* file_name, ThreadContext *tc)
 {

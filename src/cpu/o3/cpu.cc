@@ -458,8 +458,10 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
            panic("cannot read symtab!");
          }
 
-        // Load Virtual Tables
+        // Load Virtual Tables and TyCHE symbols
         readVirtualTable(seglist[seglist.size()-1].c_str(),o3_tc);
+        readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(),o3_tc);
+        readTypeMetadata("allocation_points.hash", o3_tc);
 
          // UWord keyW, valW;
          // VG_initIterFM(o3_tc->FunctionSymbols);
