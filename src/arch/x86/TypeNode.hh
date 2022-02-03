@@ -93,20 +93,22 @@ namespace X86ISA
 #define EFFECTIVE_COERCED_INT32_HASH    0x51A0B9BF4F692902ull   // Random
 #define EFFECTIVE_COERCED_INT8_PTR_HASH 0x2317E969C295951Dull   // Random
 
-struct AllocatioPointMeta
+class AllocatioPointMeta
 {
-    std::string FuncName;
-    int64_t    lineNum;
-    int64_t    ColNume;
-    std::string TypeName;
-    uint64_t    ConstValue;
-    uint64_t    Hash1;
-    uint64_t    Hash2;
+    public:
+        std::string FuncName;
+        int64_t    lineNum;
+        int64_t    ColNume;
+        std::string TypeName;
+        uint64_t    ConstValue;
+        uint64_t    Hash1;
+        uint64_t    Hash2;
+        std::string AllocatorName;
 };
-typedef AllocatioPointMeta AllocatioPointMeta;
 
-struct TypeEntryInfo
+class TypeEntryInfo
 {
+    public:
     bool        Valid;
     uint64_t    Offset;
     bool        Coerced;
@@ -156,11 +158,10 @@ struct TypeEntryInfo
         ParentType = "";
     }
 };
-typedef struct TypeEntryInfo TypeEntryInfo;
 
-
-struct TypeMetadataInfo 
+class TypeMetadataInfo 
 {
+    public:
     bool Valid;
     bool IsAllocationPointMetadata;
     std::string FileName;
@@ -169,8 +170,6 @@ struct TypeMetadataInfo
     std::multimap<uint64_t, TypeEntryInfo> TypeEntrys;
 
 };
-typedef struct TypeMetadataInfo TypeMetadataInfo;
-
 
 struct my_effective_info_entry {
     std::string global_name;

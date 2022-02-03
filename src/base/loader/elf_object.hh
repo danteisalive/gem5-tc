@@ -70,7 +70,7 @@ class ElfObject : public ObjectFile
 
     ElfObject *interpreter;
 
-    std::map<Elf64_Addr, std::vector<std::string>> virtual_tables; 
+    std::map<Addr, std::vector<std::string>> virtual_tables; 
 
     bool verifyExtractedVirtualTable(const std::vector<std::string> vt);
 
@@ -110,6 +110,7 @@ class ElfObject : public ObjectFile
     std::map<Elf64_Addr, Elf64_Half> obj_sym_shndxs;
 
 
+    std::map<Addr, std::vector<std::string>>  getVirtualTables() {return virtual_tables;}
 
     virtual ~ElfObject() {}
 

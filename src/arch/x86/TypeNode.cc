@@ -85,7 +85,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
     type_metadata_info.TypeEntrys.clear();
     type_metadata_info.Valid = false;
 
-    std::vector<TypeMetadataInfo> TypeMetadata;
+    //std::vector<TypeMetadataInfo> TypeMetadata;
 
     std::string line;
     while (std::getline(input, line))
@@ -120,7 +120,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                 METAID = "";
 
                 type_metadata_info.IsAllocationPointMetadata = false;
-                TypeMetadata.push_back(type_metadata_info);    
+                tc->TypeMetaDataBuffer.push_back(type_metadata_info);    
                 type_metadata_info.FileName = "";
                 type_metadata_info.AllocationPointSize = 0;
                 type_metadata_info.TypeEntrys.clear();
@@ -263,10 +263,11 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                                                 ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
                                                 ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
                                                 ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
+                                                (tokens[7]) //Allocator Name
                                                 };
 
             type_metadata_info.IsAllocationPointMetadata = true;
-            TypeMetadata.push_back(type_metadata_info); 
+            tc->TypeMetaDataBuffer.push_back(type_metadata_info); 
 
 
             type_metadata_info.FileName = "";
@@ -275,9 +276,6 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             type_metadata_info.IsAllocationPointMetadata = false;
             type_metadata_info.Valid = false;
             
-
-
-
         } 
         else
         {
@@ -388,6 +386,32 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
     assert(sym_name.size());
     assert(sym_shndx.size());
     assert(sym_size.size());
+
+    for (auto &sym : sym_name)
+    {
+
+        // seperate the information by #
+        std::string input = sym.second.substr(17, sym.second.size() - 1);
+        std::istringstream ss(input);
+        std::string token;
+        std::vector<std::string> tokens;
+        while(std::getline(ss, token, '#')) {
+            tokens.push_back(token);
+        }
+
+        assert(tokens.size() == 6 && "Tokens size is not equal to 6!\n" );
+
+        AllocatioPointMeta AllocPointMeta =     {tokens[0], // FuncName
+                                                ((tokens[4].size() != 0) ? std::stoi(tokens[4]) : 0), // line 
+                                                ((tokens[5].size() != 0) ? std::stoi(tokens[5]) : 0), // column
+                                                (""), // TypeName
+                                                (0), // ConstValue
+                                                ((tokens[2].size() != 0) ? std::stoull(tokens[2]) : 0), // Hash1
+                                                ((tokens[3].size() != 0) ? std::stoull(tokens[3]) : 0), // Hash2
+                                                (tokens[1]) // Allocator Name
+                                                };
+        tc->AllocationPointMetaBuffer.insert(std::make_pair(sym.first, AllocPointMeta));
+    }
 
     return true;
 }
@@ -525,6 +549,8 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
             assert("A symbole that starts with _ZTV!\n");
         }
     }
+
+    tc->VirtualTablesBuffer = elf_obj->getVirtualTables();
 
     return false;
 }

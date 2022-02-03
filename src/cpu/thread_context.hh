@@ -60,12 +60,16 @@
 #include "cpu/simple/WordFM.hh"
 #include "mem/page_table.hh"
 #include "sim/process.hh"
+#include "arch/TypeNode.hh"
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
 // DTB pointers.
 namespace TheISA
 {
     class Decoder;
+    class TypeMetadataInfo;
+    class TypeEntryInfo;
+    class AllocatioPointMeta;
 }
 class BaseCPU;
 class BaseTLB;
@@ -112,15 +116,16 @@ class ThreadContext
     typedef TheISA::FloatRegBits FloatRegBits;
     typedef TheISA::CCReg CCReg;
     typedef TheISA::MiscReg MiscReg;
+    typedef TheISA::TypeMetadataInfo TypeMetadataInfo;
     using VecRegContainer = TheISA::VecRegContainer;
     using VecElem = TheISA::VecElem;
   public:
 
     //Addr here is the AP/DP point address
-    typedef std::map<Addr,  TheISA::TyCHEAllocationPoint> SymbolCache;
-    typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>
-                                                    ShadowMemoryAliasTable;
-
+    typedef std::map<Addr,  TheISA::TyCHEAllocationPoint>       SymbolCache;
+    typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>   ShadowMemoryAliasTable;
+    typedef std::map<Addr, TheISA::AllocatioPointMeta>          AllocationPointMetaTable;
+    typedef std::map<Addr, std::vector<std::string>>            VirtualTables; 
 
 
     enum COLLECTOR_STATUS
@@ -136,7 +141,7 @@ class ThreadContext
 
     SymbolCache                                 syms_cache;
     TheISA::PointerID                           PID = TheISA::PointerID(0);
-    uint64_t                                PointerTracker[TheISA::NumIntRegs];
+    uint64_t                                    PointerTracker[TheISA::NumIntRegs];
     ShadowMemoryAliasTable                      ShadowMemory;
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
@@ -148,8 +153,13 @@ class ThreadContext
     bool                                        InSlice;
 
 
-    uint64_t                             ap_base;
-    uint64_t                             AtomicPID;
+    uint64_t                                    ap_base;
+    uint64_t                                    AtomicPID;
+
+    std::vector<TypeMetadataInfo>       TypeMetaDataBuffer;
+    AllocationPointMetaTable            AllocationPointMetaBuffer;
+    VirtualTables                       VirtualTablesBuffer;
+
 
     enum Status
     {
