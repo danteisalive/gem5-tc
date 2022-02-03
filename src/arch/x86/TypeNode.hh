@@ -93,9 +93,22 @@ namespace X86ISA
 #define EFFECTIVE_COERCED_INT32_HASH    0x51A0B9BF4F692902ull   // Random
 #define EFFECTIVE_COERCED_INT8_PTR_HASH 0x2317E969C295951Dull   // Random
 
+struct AllocatioPointMeta
+{
+    std::string FuncName;
+    int64_t    lineNum;
+    int64_t    ColNume;
+    std::string TypeName;
+    uint64_t    ConstValue;
+    uint64_t    Hash1;
+    uint64_t    Hash2;
+};
+typedef AllocatioPointMeta AllocatioPointMeta;
+
 struct TypeEntryInfo
 {
     bool        Valid;
+    uint64_t    Offset;
     bool        Coerced;
     uint64_t    LowerBound;
     uint64_t    UpperBound;
@@ -106,6 +119,7 @@ struct TypeEntryInfo
     std::string ParentType;
 
     TypeEntryInfo(
+        uint64_t    off,
         bool        c, 
         uint64_t    lb,
         uint64_t    ub,
@@ -117,6 +131,7 @@ struct TypeEntryInfo
     )
     {
         Valid = true;
+        Offset = off;
         Coerced = c;
         LowerBound = lb;
         UpperBound = ub;
@@ -130,6 +145,7 @@ struct TypeEntryInfo
     TypeEntryInfo()
     {
         Valid = false;
+        Offset = 0;
         Coerced = false;
         LowerBound = 0;
         UpperBound = 0;
@@ -145,8 +161,11 @@ typedef struct TypeEntryInfo TypeEntryInfo;
 
 struct TypeMetadataInfo 
 {
+    bool Valid;
+    bool IsAllocationPointMetadata;
     std::string FileName;
-    uint64_t AllocationPointSize;
+    int AllocationPointSize;
+    AllocatioPointMeta AllocPointMeta;
     std::multimap<uint64_t, TypeEntryInfo> TypeEntrys;
 
 };
@@ -290,6 +309,7 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc);
 
 bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc);
 bool readTypeMetadata(const char* file_name, ThreadContext *tc);
+
 
 }
 

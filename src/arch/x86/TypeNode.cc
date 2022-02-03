@@ -67,17 +67,25 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
     std::ifstream input(file_name);
     
     std::string FILENAME = "";
-    std::string APSIZE = "";
-    std::string OFFSET = "";
-    std::string CORECED = "";
-    std::string LB = "";
-    std::string UB = "";
-    std::string FAM = "";
+    int APSIZE = -1;
+    int OFFSET = 0;
+    bool CORECED = false;
+    int LB = 0;
+    int UB = 0;
+    bool FMA = false;
     std::string NAME = "";
-    std::string VPTR = "";
+    bool VPTR = false;
     std::string METATYPE = "";
-    std::string PARENT = "";
+    std::string PARENTTYPE = "";
+    std::string METAID = "";
 
+    TypeMetadataInfo type_metadata_info;
+    type_metadata_info.FileName = "";
+    type_metadata_info.AllocationPointSize = 0;
+    type_metadata_info.TypeEntrys.clear();
+    type_metadata_info.Valid = false;
+
+    std::vector<TypeMetadataInfo> TypeMetadata;
 
     std::string line;
     while (std::getline(input, line))
@@ -86,67 +94,197 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
         std::string key, answer;
         iss >> key;
 
+
         // DPRINTF(TypeMetadata, "KEY: %s\n", key);
         // DPRINTF(TypeMetadata, "RAW: %s\n", line);
         if (key == "FILENAME") 
         {
             answer = line.substr(10, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            
+            // if this is valid, it means this is not an Allocation Point metadata, save it for future!
+            if(type_metadata_info.Valid)
+            {
+                assert(APSIZE == 0 && "APSIZE is not zero for a not allocation point metadata!\n");
+                            FILENAME = "";
+                APSIZE = -1;
+                OFFSET = 0;
+                CORECED = false;
+                LB = 0;
+                UB = 0;
+                FMA = false;
+                NAME = "";
+                VPTR = false;
+                METATYPE = "";
+                PARENTTYPE = "";
+                METAID = "";
+
+                type_metadata_info.IsAllocationPointMetadata = false;
+                TypeMetadata.push_back(type_metadata_info);    
+                type_metadata_info.FileName = "";
+                type_metadata_info.AllocationPointSize = 0;
+                type_metadata_info.TypeEntrys.clear();
+                type_metadata_info.IsAllocationPointMetadata = false;
+                type_metadata_info.Valid = false;
+            }
+
+            type_metadata_info.FileName = answer;
+            type_metadata_info.Valid = true;
+
+
         }
         else if (key == "APSIZE") 
         {
             answer = line.substr(7, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            assert(APSIZE == -1 && "APSIZE IS NOT -1 Before updating it!\n");
+            APSIZE = std::stoi(answer);
+            assert(APSIZE > 0 && "APSIZE IS NOT GREATER THAN 0!\n");
+            assert(type_metadata_info.Valid && "type_metadata_info IS NOT VALID!\n");
+            type_metadata_info.AllocationPointSize = APSIZE;
+            
         }
         else if (key == "OFFSET") 
         {
             answer = line.substr(7, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            OFFSET = std::stoull(answer);
+            assert(OFFSET >= 0 && "OFFSET IS NOT GREATER THAN 0!\n");
         }
         else if (key == "CORECED") 
         {
             answer = line.substr(8, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            assert((answer == "Y" || answer == "N") && "CORECED IS NOT Y or N!\n");
+            CORECED = (answer == "Y") ? true : false;
         }
         else if (key == "LB") 
         {
             answer = line.substr(3, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            LB = std::stoull(answer);
+            assert(LB >= 0 && "LB IS NOT GREATER THAN 0!\n");
         }
         else if (key == "UB") 
         {
             answer = line.substr(3, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            UB = std::stoull(answer);
+            assert(UB >= 0 && "UB IS NOT GREATER THAN 0!\n");
         }
         else if (key == "FAM") 
         {
             answer = line.substr(4, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            assert((answer == "Y" || answer == "N") && "CORECED IS NOT Y or N!\n");
+            FMA = (answer == "Y") ? true : false;
         } 
         else if (key == "NAME") 
         {
             answer = line.substr(5, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            NAME = answer;
         } 
         else if (key == "VPTR") 
         {
             answer = line.substr(5, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            VPTR = (answer == "Y") ? true : false;
         } 
         else if (key == "METATYPE") 
         {
             answer = line.substr(9, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            METATYPE = answer;
         } 
         else if (key == "PARENTTYPE") 
         {
             answer = line.substr(11, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            PARENTTYPE = answer;
+            APSIZE--;
+            assert(APSIZE >= 0 && "APSIZE is less than zero!\n");
+
+
+            // here we have the whole Metadata Entry, insert it!
+            
+            TypeEntryInfo type_entry_info((uint64_t)OFFSET, 
+                                        CORECED,
+                                        (uint64_t)LB,
+                                        (uint64_t)UB,
+                                        FMA,
+                                        NAME,
+                                        VPTR,
+                                        METATYPE,
+                                        PARENTTYPE);
+
+            type_metadata_info.TypeEntrys.insert(
+                            std::pair<uint64_t, TypeEntryInfo>(type_entry_info.Offset, type_entry_info));
+            
         }
+        else if (key == "METAID") 
+        {
+            // a type is only used when we have a meta id otherwise it's useless
+            answer = line.substr(7, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            METAID = answer;
+
+            // by the time we are here, APSIZE always should be zero! 
+            assert(APSIZE == 0 && "METAID is seen and APSIZE is not zero!\n");
+
+            // seperate the information by #
+            std::string input = METAID;
+            std::istringstream ss(input);
+            std::string token;
+            std::vector<std::string> tokens;
+            while(std::getline(ss, token, '#')) {
+                tokens.push_back(token);
+            }
+
+            assert(tokens.size() == 7 && "Tokens size is not equal to 7!\n" );
+
+            FILENAME = "";
+            APSIZE = -1;
+            OFFSET = 0;
+            CORECED = false;
+            LB = 0;
+            UB = 0;
+            FMA = false;
+            NAME = "";
+            VPTR = false;
+            METATYPE = "";
+            PARENTTYPE = "";
+            METAID = "";
+
+            type_metadata_info.AllocPointMeta = {tokens[0], // FuncName
+                                                ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
+                                                ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                (tokens[3]), // TypeName
+                                                ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
+                                                ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
+                                                ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
+                                                };
+
+            type_metadata_info.IsAllocationPointMetadata = true;
+            TypeMetadata.push_back(type_metadata_info); 
+
+
+            type_metadata_info.FileName = "";
+            type_metadata_info.AllocationPointSize = 0;
+            type_metadata_info.TypeEntrys.clear();
+            type_metadata_info.IsAllocationPointMetadata = false;
+            type_metadata_info.Valid = false;
+            
+
+
+
+        } 
         else
         {
             DPRINTF(TypeMetadata, "Can't find any key: %s\n", key); 
+            assert(0);
         }
+        
     }
 
     return true;
