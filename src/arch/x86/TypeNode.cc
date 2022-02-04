@@ -68,10 +68,10 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
     
     std::string FILENAME = "";
     int APSIZE = -1; 
-    int OFFSET = 0;
+    uint64_t OFFSET = 0;
     bool CORECED = false; CORECED = CORECED;
-    int LB = 0;
-    int UB = 0;
+    uint64_t LB = 0;
+    uint64_t UB = 0;
     bool FMA = false; FMA = FMA;
     std::string NAME = "";
     bool VPTR = false;  VPTR = VPTR;
@@ -94,8 +94,8 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
         iss >> key;
 
 
-        DPRINTF(TypeMetadata, "KEY: %s\n", key);
-        DPRINTF(TypeMetadata, "RAW: %s\n", line);
+        // DPRINTF(TypeMetadata, "KEY: %s\n", key);
+        // DPRINTF(TypeMetadata, "RAW: %s\n", line);
         
         if (key == "FILENAME") 
         {
@@ -119,7 +119,15 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                 PARENTTYPE = "";
                 METAID = "";
 
-                tc->TypeMetaDataBuffer.push_back(type_metadata_info);    
+                AllocatioPointMeta _AllocPointMetaNull;
+                assert(!type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
+                assert(!type_metadata_info.GetIsAllocationPointMetadata() && "IsAllocationPointMetadata is valid!\n");
+                type_metadata_info.SetIsAllocationPointMetadata(false);
+                type_metadata_info.SetAllocationPointMeta(_AllocPointMetaNull);
+
+
+                tc->TypeMetaDataBuffer.push_back(type_metadata_info);  
+
                 type_metadata_info.SetFileName("");
                 type_metadata_info.SetAllocationPointSize(0);
                 type_metadata_info.ResetTypeEntrys();
@@ -148,7 +156,8 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             answer = line.substr(7, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
             OFFSET = std::stoull(answer);
-            assert(OFFSET >= 0 && "OFFSET IS NOT GREATER THAN 0!\n");
+            DPRINTF(TypeMetadata, "Key: %s Answer: %x\n", key, OFFSET);
+            //assert(OFFSET >= 0 && "OFFSET IS NOT GREATER THAN 0!\n");
         }
         else if (key == "CORECED") 
         {
@@ -162,14 +171,16 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             answer = line.substr(3, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
             LB = std::stoull(answer);
-            assert(LB >= 0 && "LB IS NOT GREATER THAN 0!\n");
+            DPRINTF(TypeMetadata, "Key: %s Answer: %x\n", key, LB);
+            //assert(LB >= 0 && "LB IS NOT GREATER THAN 0!\n");
         }
         else if (key == "UB") 
         {
             answer = line.substr(3, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
             UB = std::stoull(answer);
-            assert(UB >= 0 && "UB IS NOT GREATER THAN 0!\n");
+            DPRINTF(TypeMetadata, "Key: %s Answer: %x\n", key, UB);
+            //assert(UB >= 0 && "UB IS NOT GREATER THAN 0!\n");
         }
         else if (key == "FAM") 
         {
@@ -207,10 +218,10 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
 
             // here we have the whole Metadata Entry, insert it!
             
-            TypeEntryInfo type_entry_info((uint64_t)OFFSET, 
+            TypeEntryInfo type_entry_info(OFFSET, 
                                         CORECED,
-                                        (uint64_t)LB,
-                                        (uint64_t)UB,
+                                        LB,
+                                        UB,
                                         FMA,
                                         NAME,
                                         VPTR,
@@ -256,7 +267,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
 
             AllocatioPointMeta _AllocPointMeta = AllocatioPointMeta
                                                 (
-                                                    tokens[0], // FuncName
+                                                    tokens[0], // FileName
                                                     ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
                                                     ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
                                                     (tokens[3]), // TypeName
@@ -267,13 +278,18 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                                                 );
             
             
-            
+            assert(!type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
+            assert(!type_metadata_info.GetIsAllocationPointMetadata() && "IsAllocationPointMetadata is valid!\n");
             type_metadata_info.SetAllocationPointMeta(_AllocPointMeta);
+            assert(type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is not valid!\n");
 
             type_metadata_info.SetIsAllocationPointMetadata(true);
+            assert(type_metadata_info.GetValidFlag() && "type_metadata_info is not valid!\n");
             tc->TypeMetaDataBuffer.push_back(type_metadata_info); 
 
-
+            AllocatioPointMeta _AllocPointMetaNull;
+            type_metadata_info.SetAllocationPointMeta(_AllocPointMetaNull);
+            assert(!type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
             type_metadata_info.SetFileName("");
             type_metadata_info.SetAllocationPointSize(0);
             type_metadata_info.ResetTypeEntrys();
@@ -407,7 +423,7 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
         assert(tokens.size() == 6 && "Tokens size is not equal to 6!\n" );
 
         AllocatioPointMeta AllocPointMeta = AllocatioPointMeta(
-                                                    tokens[0], // FuncName
+                                                    tokens[0], // FileName
                                                     ((tokens[4].size() != 0) ? std::stoi(tokens[4]) : 0), // line 
                                                     ((tokens[5].size() != 0) ? std::stoi(tokens[5]) : 0), // column
                                                     (""), // TypeName
@@ -562,59 +578,6 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
 }
 
 
-
-// inline static std::ostream& operator<< (std::ostream& out, const TypeMetadataInfo& tmi)
-// {
-//             assert(tmi.GetValidFlag() && "Printing an invalid TypeMetadataInfo\n");
-
-//             ccprintf(out, "TypeMetadataInfo:" 
-//                         "\n\tIsAllocationPointMetadata = %d"
-//                         "\n\tFileName = %s"
-//                         "\n\tAllocPointMeta = %s"
-//                         "\n\tAllocationPointSize = %d" 
-//                         "\n\tTypeEntrys = ",
-//                         tmi.GetIsAllocationPointMetadata(),
-//                         tmi.GetFileName(),
-//                         tmi.GetAllocatioPointMeta(),
-//                         tmi.GetAllocatioPointMeta()
-//                         );
-            
-//             for (auto const & elem : tmi.GetTypeEntrys())
-//             {
-//                 ccprintf(out, "\t\tOffset[%d]=\n\t\t%s\n", elem.first, elem.second);
-//             }
-
-
-//             return out;
-// }
-
-
-// inline static std::ostream& operator << (std::ostream& out, const TypeEntryInfo& tei )
-// {
-//     assert(tei.GetValidFlag() && "Printing an invalid TypeEntryInfo\n");
-
-//             ccprintf(out, "TypeEntryInfo:" 
-//                         "\n\tOffset = %d"
-//                         "\n\tCoerced = %d"
-//                         "\n\tLower Bound = %x"
-//                         "\n\tUpper Bound = %x"
-//                         "\n\tFlexible Member Array = %d"
-//                         "\n\tName = %s"
-//                         "\n\tVirtual Table Pointer = %d"
-//                         "\n\tMeta Type = %s"
-//                         "\n\tParent Type = %s", 
-//                         tei.GetOffset(),
-//                         tei.GetCoerced(),
-//                         tei.GetLowerBound(),
-//                         tei.GetUpperBound(),
-//                         tei.GetFlexibleMemberArray(),
-//                         tei.GetName(),
-//                         tei.GetVirtualTablePointer(),
-//                         tei.GetMetaType(),
-//                         tei.GetParentType()
-//                         );
-//             return out;
-// }
 
 
 }

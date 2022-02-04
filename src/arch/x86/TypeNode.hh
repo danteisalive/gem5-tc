@@ -98,7 +98,7 @@ class AllocatioPointMeta
 {
     private:
         bool Valid;
-        std::string FuncName;
+        std::string FileName;
         int64_t     lineNum;
         int64_t     ColNume;
         std::string TypeName;
@@ -109,11 +109,12 @@ class AllocatioPointMeta
 
     public:
         bool GetValidFlag() {return Valid;}
+        void SetValidFlag(bool _valid) {Valid = _valid;}
 
     public:
         AllocatioPointMeta() {
             Valid = false;
-            FuncName = "";
+            FileName = "";
             lineNum = -1;
             ColNume = -1;
             TypeName = "";
@@ -124,7 +125,7 @@ class AllocatioPointMeta
         }
 
         AllocatioPointMeta(
-                std::string _FuncName,
+                std::string _FileName,
                 int64_t     _lineNum,
                 int64_t     _ColNume,
                 std::string _TypeName,
@@ -133,7 +134,7 @@ class AllocatioPointMeta
                 uint64_t    _Hash2,
                 std::string _AllocatorName)
             {
-                FuncName = _FuncName;
+                FileName = _FileName;
                 lineNum = _lineNum;
                 ColNume = _ColNume;
                 TypeName = _TypeName;
@@ -145,12 +146,37 @@ class AllocatioPointMeta
 
             }
         
-        //friend std::ostream& operator << (std::ostream& out, const AllocatioPointMeta& apm );
+        friend std::ostream& operator << (std::ostream& out, const AllocatioPointMeta& apm )
+        {
+            assert(apm.Valid && "Printing an invalid AllocatioPointMeta\n");
+
+            ccprintf(out, "AllocatioPointMeta:" 
+                        "\n\tFileName= %s"
+                        "\n\tlineNum = %d"
+                        "\n\tColNume = %d"
+                        "\n\tTypeName = %s"
+                        "\n\tConstValue = %x" 
+                        "\n\tHash1 = %x"
+                        "\n\tHash2 = %x"
+                        "\n\tAllocatorName = %s\n",
+                        apm.FileName,
+                        apm.lineNum,
+                        apm.ColNume,
+                        apm.TypeName,
+                        apm.ConstValue,
+                        apm.Hash1,
+                        apm.Hash2,
+                        apm.AllocatorName
+                        );
+
+
+            return out;
+        }
 
         AllocatioPointMeta (const AllocatioPointMeta& apm)
         {
-            this->FuncName = apm.FuncName;
-            this->FuncName = apm.FuncName;
+            this->FileName = apm.FileName;
+            this->FileName = apm.FileName;
             this->lineNum = apm.lineNum;
             this->ColNume = apm.ColNume;
             this->TypeName = apm.TypeName;
@@ -169,8 +195,8 @@ class AllocatioPointMeta
                     return *this;
 
                 // do the copy
-                this->FuncName = apm.FuncName;
-                this->FuncName = apm.FuncName;
+                this->FileName = apm.FileName;
+                this->FileName = apm.FileName;
                 this->lineNum = apm.lineNum;
                 this->ColNume = apm.ColNume;
                 this->TypeName = apm.TypeName;
@@ -240,7 +266,6 @@ class TypeEntryInfo
             ParentType = "";
         }
 
-        //friend std::ostream& operator << (std::ostream& out, const TypeEntryInfo& tei );
         
 
         TypeEntryInfo(const TypeEntryInfo& tei)
@@ -249,7 +274,7 @@ class TypeEntryInfo
             this->Offset = tei.Offset;
             this->Coerced = tei.Coerced;
             this->LowerBound = tei.LowerBound;
-            this->UpperBound = tei.LowerBound;
+            this->UpperBound = tei.UpperBound;
             this->FlexibleMemberArray = tei.FlexibleMemberArray;
             this->Name = tei.Name;
             this->VirtualTablePointer = tei.VirtualTablePointer;
@@ -266,7 +291,7 @@ class TypeEntryInfo
             this->Offset = tei.Offset;
             this->Coerced = tei.Coerced;
             this->LowerBound = tei.LowerBound;
-            this->UpperBound = tei.LowerBound;
+            this->UpperBound = tei.UpperBound;
             this->FlexibleMemberArray = tei.FlexibleMemberArray;
             this->Name = tei.Name;
             this->VirtualTablePointer = tei.VirtualTablePointer;
@@ -275,6 +300,36 @@ class TypeEntryInfo
 
             return (*this);
         }
+
+
+
+        friend std::ostream& operator << (std::ostream& out, const TypeEntryInfo& tei )
+        {
+            assert(tei.Valid && "Printing an invalid TypeEntryInfo\n");
+
+                    ccprintf(out, "TypeEntryInfo:" 
+                                "\n\tOffset = %d"
+                                "\n\tCoerced = %d"
+                                "\n\tLower Bound = %x"
+                                "\n\tUpper Bound = %x"
+                                "\n\tFlexible Member Array = %d"
+                                "\n\tName = %s"
+                                "\n\tVirtual Table Pointer = %d"
+                                "\n\tMeta Type = %s"
+                                "\n\tParent Type = %s\n", 
+                                tei.Offset,
+                                tei.Coerced,
+                                tei.LowerBound,
+                                tei.UpperBound,
+                                tei.FlexibleMemberArray,
+                                tei.Name,
+                                tei.VirtualTablePointer,
+                                tei.MetaType,
+                                tei.ParentType
+                                );
+                    return out;
+        }
+
 
         uint64_t GetOffset() {return Offset;}
 };
@@ -352,125 +407,54 @@ class TypeMetadataInfo
         void ResetTypeEntrys() {TypeEntrys.clear();}
         void SetFileName(std::string filename) {FileName = filename;}
         void SetIsAllocationPointMetadata(bool _IsAllocationPointMetadata) {IsAllocationPointMetadata = _IsAllocationPointMetadata;}
+        bool GetIsAllocationPointMetadata() const {return IsAllocationPointMetadata;}
         void SetAllocationPointMeta(AllocatioPointMeta& _AllocPointMeta) {AllocPointMeta = _AllocPointMeta;}
-
+        AllocatioPointMeta GetAllocatioPointMeta() const {return AllocPointMeta;}
         void InsertTypeEntry(uint64_t offset, TypeEntryInfo& tei)
         {
             TypeEntrys.insert(std::make_pair(offset, tei));
         }
 
-        //friend std::ostream& operator << (std::ostream& out, const TypeMetadataInfo& tmi);
+
+
+        friend std::ostream& operator << (std::ostream& out, const TypeMetadataInfo& tmi)
+        {
+            assert(tmi.Valid && "Printing an invalid TypeMetadataInfo\n");
+            
+            if (tmi.IsAllocationPointMetadata)
+                ccprintf(out, "TypeMetadataInfo:" 
+                                "\n\tIsAllocationPointMetadata = %d"
+                                "\n\tFileName = %s"
+                                "\n\tAllocPointMeta = %s"
+                                "\n\tAllocationPointSize = %d" 
+                                "\n\tTypeEntrys = \n",
+                                tmi.IsAllocationPointMetadata,
+                                tmi.FileName,
+                                tmi.AllocPointMeta,
+                                tmi.AllocationPointSize
+                                );
+            else 
+                ccprintf(out, "TypeMetadataInfo:" 
+                                "\n\tIsAllocationPointMetadata = %d"
+                                "\n\tFileName = %s"
+                                "\n\tAllocationPointSize = %d" 
+                                "\n\tTypeEntrys = \n",
+                                tmi.IsAllocationPointMetadata,
+                                tmi.FileName,
+                                tmi.AllocationPointSize
+                                );        
+                    
+            for (auto const & elem : tmi.TypeEntrys)
+            {
+                ccprintf(out, "\tOffset[%d]=\n\t%s\n", elem.first, elem.second);
+            }
+
+
+            return out;
+        }
         
 };
-
-struct my_effective_info_entry {
-    std::string global_name;
-    uint32_t flags;
-    size_t lb;
-    size_t ub;
-};
-typedef struct my_effective_info_entry my_effective_info_entry;
-
-struct my_effective_info {
-    std::string global_name;
-    uint64_t tid;
-    uint64_t num_access;
-    const std::string name;
-    uint32_t size;
-    uint32_t num_entries;
-    uint32_t flags;
-    std::string next;
-    std::vector<my_effective_info_entry> entries;
-};
-
-typedef struct my_effective_info my_effective_info;
-
-
-typedef struct EFFECTIVE_INFO EFFECTIVE_INFO;
-typedef struct EFFECTIVE_TID EFFECTIVE_TID;
-
-struct EFFECTIVE_TID
-{
-    uint64_t tid;
-    uint64_t num_accesses;
-};
-
-
-
-typedef intptr_t EFFECTIVE_BOUNDS EFFECTIVE_VECTOR_SIZE(16);
-
-struct EFFECTIVE_ENTRY
-{
-    uint64_t hash;              // Layout entry type.
-    uint64_t _pad;              // Padding.
-    EFFECTIVE_BOUNDS bounds;    // Sub-object bounds.
-} EFFECTIVE_PACKED;
-
-typedef struct EFFECTIVE_ENTRY EFFECTIVE_ENTRY;
-
-#define EFFECTIVE_ENTRY_EMPTY_HASH  EFFECTIVE_TYPE_NIL_HASH
-
-
-struct EFFECTIVE_INFO_ENTRY
-{
-    const EFFECTIVE_INFO *type;
-    uint32_t flags;
-    size_t lb;
-    size_t ub;
-};
-typedef struct EFFECTIVE_INFO_ENTRY EFFECTIVE_INFO_ENTRY;
-
-#define EFFECTIVE_INFO_ENTRY_FLAG_INHERITANCE   0x1
-#define EFFECTIVE_INFO_ENTRY_FLAG_VIRTUAL       0x2
-
-/*
- * Type info (for human readable type information).
- */
-struct EFFECTIVE_INFO
-{
-    EFFECTIVE_TID *tid_info;
-    const char *name;
-    uint32_t size;
-    uint32_t num_entries;
-    uint32_t flags;
-    const EFFECTIVE_INFO *next;
-    EFFECTIVE_INFO_ENTRY entries[];
-};
-
-struct EFFECTIVE_TYPE
-{   
-    uint64_t hash;              // Type-specific hash value.
-    uint64_t hash2;             // 2nd type-specific hash value.
-    uint32_t size;              // sizeof(T)
-    uint32_t size_fam;          // sizeof any FAM, else sizeof(T)
-    uint32_t offset_fam;        // offset of 1st FAM element, else 0
-    uint32_t sanity;            // EFFECTIVE_SANITY.
-    size_t magic;               // Fixed-point (1 / size_fam) representation
-    size_t mask;                // Mask for layout[]
-    const EFFECTIVE_INFO *info; // Type info
-    uint64_t next;              // Hash of next type coercion
-    EFFECTIVE_ENTRY layout[];   // The layout hash table.
-};
-
-/*
- * Per-allocated-object meta-data representation.
- */
-struct EFFECTIVE_META
-{
-    const EFFECTIVE_TYPE *type; // Object's effective type sans bounds.
-    size_t size;                // Object's allocation size.
-};
-
-
-void printTypeTree(std::map<int, std::map<int, std::set<std::pair<int, int>>>>& typeTree, 
-                  std::ofstream *out);
-
-void buildTypeTree(my_effective_info ei,
-                  std::map<std::string, my_effective_info> effInfos,
-                  std::map<int, std::map<int, std::set<std::pair<int, int>>>>& typeTree);
-
-void retreiveEffInfosFromFile(const std::string HashFileName, 
-                            std::map<std::string, my_effective_info>& EffInfos);        
+   
 
 bool readVirtualTable(const char* file_name, ThreadContext *tc);  
 

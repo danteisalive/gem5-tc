@@ -463,17 +463,15 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), o3_tc);
         readTypeMetadata("allocation_points.hash", o3_tc);
 
-        // for (int i = 0; i < o3_tc->TypeMetaDataBuffer.size(); i++)
-        // {
-        //     //DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", o3_tc->TypeMetaDataBuffer[i]);
-        //     std::cout << o3_tc->TypeMetaDataBuffer[i];
-        // }
+        for (int i = 0; i < o3_tc->TypeMetaDataBuffer.size(); i++)
+        {
+            DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", o3_tc->TypeMetaDataBuffer[i]);
+        }
 
-        // for (auto const & elem : o3_tc->AllocationPointMetaBuffer)
-        // {
-        //     // DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", elem.second);
-        //     std::cout << elem.second;
-        // }
+        for (auto const & elem : o3_tc->AllocationPointMetaBuffer)
+        {
+            DPRINTF(TypeMetadata, "DUMPING AllocationPointMetaBuffer:\n %s", elem.second);
+        }
         
 
          // UWord keyW, valW;
