@@ -59,7 +59,6 @@
 #include "arch/types.hh"
 #include "arch/utility.hh"
 #include "arch/TypeNode.hh"
-#include "arch/TypeNode.hh"
 #include "base/statistics.hh"
 #include "config/the_isa.hh"
 #include "cpu/activity.hh"

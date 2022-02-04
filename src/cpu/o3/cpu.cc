@@ -459,9 +459,22 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
          }
 
         // Load Virtual Tables and TyCHE symbols
-        readVirtualTable(seglist[seglist.size()-1].c_str(),o3_tc);
-        readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(),o3_tc);
+        readVirtualTable(seglist[seglist.size()-1].c_str(), o3_tc);
+        readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), o3_tc);
         readTypeMetadata("allocation_points.hash", o3_tc);
+
+        // for (int i = 0; i < o3_tc->TypeMetaDataBuffer.size(); i++)
+        // {
+        //     //DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", o3_tc->TypeMetaDataBuffer[i]);
+        //     std::cout << o3_tc->TypeMetaDataBuffer[i];
+        // }
+
+        // for (auto const & elem : o3_tc->AllocationPointMetaBuffer)
+        // {
+        //     // DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", elem.second);
+        //     std::cout << elem.second;
+        // }
+        
 
          // UWord keyW, valW;
          // VG_initIterFM(o3_tc->FunctionSymbols);
