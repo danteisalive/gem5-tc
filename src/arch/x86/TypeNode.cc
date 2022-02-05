@@ -542,10 +542,10 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
 
     DPRINTF(TypeMetadata, "\n\n");
     assert(elf_obj && "ElfObject is null!\n");
-    assert(sym_info.size());
-    assert(sym_name.size());
-    assert(sym_shndx.size());
-    assert(sym_size.size());
+    // assert(sym_info.size());
+    // assert(sym_name.size());
+    // assert(sym_shndx.size());
+    // assert(sym_size.size());
 
 
     // extract all the vtables
@@ -572,7 +572,14 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
         }
     }
 
-    tc->VirtualTablesBuffer = elf_obj->getVirtualTables();
+    for (auto const &elem: elf_obj->getVirtualTables())
+    {
+        for (auto const &vtable : elem.second)
+        {
+            tc->VirtualTablesBuffer[elem.first].push_back(vtable);
+        }
+    }
+    // tc->VirtualTablesBuffer = elf_obj->getVirtualTables();
 
     return false;
 }

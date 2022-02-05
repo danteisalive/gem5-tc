@@ -463,6 +463,17 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), o3_tc);
         readTypeMetadata("allocation_points.hash", o3_tc);
 
+        for (auto const &elem: tc->VirtualTablesBuffer)
+        {
+            DPRINTF(TypeMetadata, "Virtual Table Address: %x\n", elem.first);
+            for (auto const& vtable: elem.second)
+            {
+                DPRINTF(TypeMetadata, "VT Entry: %s\n", vtable);
+            }
+            DPRINTF(TypeMetadata, "\n\n");
+
+        }
+
         for (int i = 0; i < o3_tc->TypeMetaDataBuffer.size(); i++)
         {
             DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", o3_tc->TypeMetaDataBuffer[i]);
@@ -473,6 +484,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             DPRINTF(TypeMetadata, "DUMPING AllocationPointMetaBuffer:\n %s", elem.second);
         }
         
+        assert(0);
 
          // UWord keyW, valW;
          // VG_initIterFM(o3_tc->FunctionSymbols);
