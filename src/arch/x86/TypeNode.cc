@@ -394,6 +394,14 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
 
         assert(tokens.size() == 6 && "Tokens size is not equal to 6!\n" );
 
+        DPRINTF(TypeMetadata, "Tokens[0]: %s "
+                              "Tokens[1]: %s " 
+                              "Tokens[2]: %s "
+                              "Tokens[3]: %s "
+                              "Tokens[4]: %s "
+                              "Tokens[5]: %s\n",
+                              tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5]);
+
         AllocationPointMeta AllocPointMeta = AllocationPointMeta(
                                                     tokens[0], // FileName
                                                     ((tokens[4].size() != 0) ? std::stoi(tokens[4]) : 0), // line 
