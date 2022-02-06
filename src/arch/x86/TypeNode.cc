@@ -101,43 +101,9 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
         {
             answer = line.substr(10, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
-            
-            // if this is valid, it means this is not an Allocation Point metadata, save it for future!
-            if(type_metadata_info.GetValidFlag())
-            {
-                assert(APSIZE == 0 && "APSIZE is not zero for a not allocation point metadata!\n");
-                            FILENAME = "";
-                APSIZE = -1;
-                OFFSET = 0;
-                CORECED = false;
-                LB = 0;
-                UB = 0;
-                FMA = false;
-                NAME = "";
-                VPTR = false;
-                METATYPE = "";
-                PARENTTYPE = "";
-                METAID = "";
-
-                AllocatioPointMeta _AllocPointMetaNull;
-                assert(!type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
-                assert(!type_metadata_info.GetIsAllocationPointMetadata() && "IsAllocationPointMetadata is valid!\n");
-                type_metadata_info.SetIsAllocationPointMetadata(false);
-                type_metadata_info.SetAllocationPointMeta(_AllocPointMetaNull);
-
-
-                tc->TypeMetaDataBuffer.push_back(type_metadata_info);  
-
-                type_metadata_info.SetFileName("");
-                type_metadata_info.SetAllocationPointSize(0);
-                type_metadata_info.ResetTypeEntrys();
-                type_metadata_info.SetIsAllocationPointMetadata(false);
-                type_metadata_info.SetValidFlag(false);
-            }
 
             type_metadata_info.SetFileName(answer);
             type_metadata_info.SetValidFlag(true);
-
 
         }
         else if (key == "APSIZE") 
@@ -238,8 +204,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
             METAID = answer;
 
-            // by the time we are here, APSIZE always should be zero! 
-            assert(APSIZE == 0 && "METAID is seen and APSIZE is not zero!\n");
+            
 
             // seperate the information by #
             std::string input = METAID;
@@ -250,7 +215,12 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                 tokens.push_back(token);
             }
 
-            assert(tokens.size() == 8 && "Tokens size is not equal to 8!\n" );
+            assert(tokens.size() == 9 && "Tokens size is not equal to 9!\n" );
+
+            
+            // by the time we are here, APSIZE always should be zero! 
+            // This is true only if this is a new type defenition
+            assert(APSIZE == 0 && "METAID is seen and APSIZE is not zero!\n");
 
             FILENAME = "";
             APSIZE = -1;
@@ -265,7 +235,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             PARENTTYPE = "";
             METAID = "";
 
-            AllocatioPointMeta _AllocPointMeta = AllocatioPointMeta
+            AllocationPointMeta _AllocPointMeta = AllocationPointMeta
                                                 (
                                                     tokens[0], // FileName
                                                     ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
@@ -277,19 +247,21 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                                                     (tokens[7]) //Allocator Name
                                                 );
             
-            
-            assert(!type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
+
+
+            assert(!type_metadata_info.GetAllocationPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
             assert(!type_metadata_info.GetIsAllocationPointMetadata() && "IsAllocationPointMetadata is valid!\n");
             type_metadata_info.SetAllocationPointMeta(_AllocPointMeta);
-            assert(type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is not valid!\n");
+            assert(type_metadata_info.GetAllocationPointMeta().GetValidFlag() && "AllocPointMeta is not valid!\n");
 
             type_metadata_info.SetIsAllocationPointMetadata(true);
             assert(type_metadata_info.GetValidFlag() && "type_metadata_info is not valid!\n");
             tc->TypeMetaDataBuffer.push_back(type_metadata_info); 
 
-            AllocatioPointMeta _AllocPointMetaNull;
+
+            AllocationPointMeta _AllocPointMetaNull;
             type_metadata_info.SetAllocationPointMeta(_AllocPointMetaNull);
-            assert(!type_metadata_info.GetAllocatioPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
+            assert(!type_metadata_info.GetAllocationPointMeta().GetValidFlag() && "AllocPointMeta is valid!\n");
             type_metadata_info.SetFileName("");
             type_metadata_info.SetAllocationPointSize(0);
             type_metadata_info.ResetTypeEntrys();
@@ -422,7 +394,7 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
 
         assert(tokens.size() == 6 && "Tokens size is not equal to 6!\n" );
 
-        AllocatioPointMeta AllocPointMeta = AllocatioPointMeta(
+        AllocationPointMeta AllocPointMeta = AllocationPointMeta(
                                                     tokens[0], // FileName
                                                     ((tokens[4].size() != 0) ? std::stoi(tokens[4]) : 0), // line 
                                                     ((tokens[5].size() != 0) ? std::stoi(tokens[5]) : 0), // column

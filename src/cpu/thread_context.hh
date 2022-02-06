@@ -69,7 +69,7 @@ namespace TheISA
     class Decoder;
     class TypeMetadataInfo;
     class TypeEntryInfo;
-    class AllocatioPointMeta;
+    class AllocationPointMeta;
 }
 class BaseCPU;
 class BaseTLB;
@@ -124,7 +124,7 @@ class ThreadContext
     //Addr here is the AP/DP point address
     typedef std::map<Addr,  TheISA::TyCHEAllocationPoint>       SymbolCache;
     typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>   ShadowMemoryAliasTable;
-    typedef std::map<Addr, TheISA::AllocatioPointMeta>          AllocationPointMetaTable;
+    typedef std::map<Addr, TheISA::AllocationPointMeta>          AllocationPointMetaTable;
     typedef std::map<Addr, std::vector<std::string>>            VirtualTables; 
 
 

@@ -94,7 +94,7 @@ namespace X86ISA
 #define EFFECTIVE_COERCED_INT32_HASH    0x51A0B9BF4F692902ull   // Random
 #define EFFECTIVE_COERCED_INT8_PTR_HASH 0x2317E969C295951Dull   // Random
 
-class AllocatioPointMeta
+class AllocationPointMeta
 {
     private:
         bool Valid;
@@ -110,9 +110,12 @@ class AllocatioPointMeta
     public:
         bool GetValidFlag() {return Valid;}
         void SetValidFlag(bool _valid) {Valid = _valid;}
+        uint64_t GetConstValue() const {return ConstValue;}
+        uint64_t GetHash1() const {return Hash1;}
+        uint64_t GetHash2() const {return Hash2;}
 
     public:
-        AllocatioPointMeta() {
+        AllocationPointMeta() {
             Valid = false;
             FileName = "";
             lineNum = -1;
@@ -124,7 +127,7 @@ class AllocatioPointMeta
             AllocatorName = "";
         }
 
-        AllocatioPointMeta(
+        AllocationPointMeta(
                 std::string _FileName,
                 int64_t     _lineNum,
                 int64_t     _ColNume,
@@ -146,11 +149,11 @@ class AllocatioPointMeta
 
             }
         
-        friend std::ostream& operator << (std::ostream& out, const AllocatioPointMeta& apm )
+        friend std::ostream& operator << (std::ostream& out, const AllocationPointMeta& apm )
         {
-            assert(apm.Valid && "Printing an invalid AllocatioPointMeta\n");
+            assert(apm.Valid && "Printing an invalid AllocationPointMeta\n");
 
-            ccprintf(out, "AllocatioPointMeta:" 
+            ccprintf(out, "AllocationPointMeta:" 
                         "\n\tFileName= %s"
                         "\n\tlineNum = %d"
                         "\n\tColNume = %d"
@@ -173,7 +176,7 @@ class AllocatioPointMeta
             return out;
         }
 
-        AllocatioPointMeta (const AllocatioPointMeta& apm)
+        AllocationPointMeta (const AllocationPointMeta& apm)
         {
             this->FileName = apm.FileName;
             this->FileName = apm.FileName;
@@ -188,7 +191,7 @@ class AllocatioPointMeta
         }
 
         // A better implementation of operator =
-        AllocatioPointMeta& operator = (const AllocatioPointMeta& apm)
+        AllocationPointMeta& operator = (const AllocationPointMeta& apm)
         {
                 // self-assignment guard
                 if (this == &apm)
@@ -341,7 +344,7 @@ class TypeMetadataInfo
         bool IsAllocationPointMetadata;
         std::string FileName;
         int AllocationPointSize;
-        AllocatioPointMeta AllocPointMeta;
+        AllocationPointMeta AllocPointMeta;
         std::multimap<uint64_t, TypeEntryInfo> TypeEntrys;
 
     public:
@@ -352,7 +355,7 @@ class TypeMetadataInfo
             FileName = "";
             AllocationPointSize = 0;
             TypeEntrys.clear();
-            // AllocPointMeta = AllocatioPointMeta;
+            // AllocPointMeta = AllocationPointMeta;
 
         }
 
@@ -361,7 +364,7 @@ class TypeMetadataInfo
             bool _IsAllocationPointMetadata,
             std::string _FileName,
             int _AllocationPointSize,
-            AllocatioPointMeta _AllocPointMeta,
+            AllocationPointMeta _AllocPointMeta,
             std::multimap<uint64_t, TypeEntryInfo> _TypeEntrys
         )
         {
@@ -408,8 +411,8 @@ class TypeMetadataInfo
         void SetFileName(std::string filename) {FileName = filename;}
         void SetIsAllocationPointMetadata(bool _IsAllocationPointMetadata) {IsAllocationPointMetadata = _IsAllocationPointMetadata;}
         bool GetIsAllocationPointMetadata() const {return IsAllocationPointMetadata;}
-        void SetAllocationPointMeta(AllocatioPointMeta& _AllocPointMeta) {AllocPointMeta = _AllocPointMeta;}
-        AllocatioPointMeta GetAllocatioPointMeta() const {return AllocPointMeta;}
+        void SetAllocationPointMeta(AllocationPointMeta& _AllocPointMeta) {AllocPointMeta = _AllocPointMeta;}
+        AllocationPointMeta GetAllocationPointMeta() const {return AllocPointMeta;}
         void InsertTypeEntry(uint64_t offset, TypeEntryInfo& tei)
         {
             TypeEntrys.insert(std::make_pair(offset, tei));
