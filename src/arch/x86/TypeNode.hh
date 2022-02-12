@@ -101,11 +101,19 @@ class AllocationPointMeta
         std::string FileName;
         int64_t     lineNum;
         int64_t     ColNume;
-        std::string TypeName;
         uint64_t    ConstValue;
         uint64_t    Hash1;
         uint64_t    Hash2;
+        uint64_t    InlinedlineNum;
+        uint64_t    InlinedColNume;
+        uint64_t    IRBBID;
+        uint64_t    IRInstID;
+        uint64_t    MCBBID;
+        uint64_t    MCInstID;
         std::string AllocatorName;
+        std::string TypeName;
+        std::string CallerName;
+        uint64_t    TID;
 
     public:
         bool GetValidFlag() {return Valid;}
@@ -124,28 +132,53 @@ class AllocationPointMeta
             ConstValue = 0;
             Hash1 = 0;
             Hash2 = 0;
+            InlinedlineNum = 0;
+            InlinedColNume = 0;
+            IRBBID = 0;
+            IRInstID = 0;
+            MCBBID = 0;
+            MCInstID = 0;
             AllocatorName = "";
+            TypeName = "";
+            CallerName = "";
         }
 
         AllocationPointMeta(
                 std::string _FileName,
                 int64_t     _lineNum,
                 int64_t     _ColNume,
-                std::string _TypeName,
                 uint64_t    _ConstValue,
                 uint64_t    _Hash1,
                 uint64_t    _Hash2,
-                std::string _AllocatorName)
+                uint64_t    _InlinedLineNum,
+                uint64_t    _InlinedColNume,
+                uint64_t    _IRBBID,
+                uint64_t    _IRInstID,
+                uint64_t    _TID,
+                uint64_t    _MCBBID,
+                uint64_t    _MCInstID,
+                std::string _AllocatorName,
+                std::string _TypeName,
+                std::string _CallerName
+                )
             {
-                FileName = _FileName;
-                lineNum = _lineNum;
-                ColNume = _ColNume;
-                TypeName = _TypeName;
-                ConstValue = _ConstValue;
-                Hash1 = _Hash1;
-                Hash2 = _Hash2;
+                FileName =      _FileName;
+                lineNum =       _lineNum;
+                ColNume =       _ColNume;
+                TypeName =      _TypeName;
+                ConstValue =    _ConstValue;
+                Hash1 =         _Hash1;
+                Hash2 =         _Hash2;
                 AllocatorName = _AllocatorName;
-                Valid = true;
+                Valid =         true;
+                CallerName =    _CallerName;
+                IRInstID =      _IRInstID;
+                IRBBID =        _IRBBID;
+                MCInstID =      _MCInstID;
+                MCBBID  =       _MCBBID;
+                TID =           _TID;
+                InlinedlineNum = _InlinedLineNum;
+                InlinedColNume = _InlinedColNume;
 
             }
         
@@ -161,7 +194,15 @@ class AllocationPointMeta
                         "\n\tConstValue = %x" 
                         "\n\tHash1 = %x"
                         "\n\tHash2 = %x"
-                        "\n\tAllocatorName = %s\n",
+                        "\n\tAllocatorName = %s"
+                        "\n\tCallerName = %s"
+                        "\n\tIRInstID = %x"
+                        "\n\tIRBBID = %x"
+                        "\n\tMCInstID = %x"
+                        "\n\tMCBBID = %x"
+                        "\n\tTID = %x"
+                        "\n\tInlinedColNume = %x"
+                        "\n\tInlinedlineNum = %x\n",
                         apm.FileName,
                         apm.lineNum,
                         apm.ColNume,
@@ -169,7 +210,15 @@ class AllocationPointMeta
                         apm.ConstValue,
                         apm.Hash1,
                         apm.Hash2,
-                        apm.AllocatorName
+                        apm.AllocatorName,
+                        apm.CallerName,
+                        apm.IRInstID,
+                        apm.IRBBID,
+                        apm.MCInstID,
+                        apm.MCBBID,
+                        apm.TID,
+                        apm.InlinedColNume,
+                        apm.InlinedlineNum
                         );
 
 
@@ -179,7 +228,6 @@ class AllocationPointMeta
         AllocationPointMeta (const AllocationPointMeta& apm)
         {
             this->FileName = apm.FileName;
-            this->FileName = apm.FileName;
             this->lineNum = apm.lineNum;
             this->ColNume = apm.ColNume;
             this->TypeName = apm.TypeName;
@@ -188,6 +236,14 @@ class AllocationPointMeta
             this->Hash2 = apm.Hash2;
             this->AllocatorName = apm.AllocatorName;
             this->Valid = apm.Valid;
+            this->CallerName =   apm.CallerName;
+            this->IRInstID =     apm.IRInstID;
+            this->IRBBID =       apm.IRBBID;
+            this->MCInstID =     apm.MCInstID;
+            this->MCBBID  =      apm.MCBBID;
+            this->TID =          apm.TID;
+            this->InlinedColNume = apm.InlinedColNume;
+            this->InlinedlineNum = apm.InlinedlineNum;
         }
 
         // A better implementation of operator =
@@ -199,7 +255,6 @@ class AllocationPointMeta
 
                 // do the copy
                 this->FileName = apm.FileName;
-                this->FileName = apm.FileName;
                 this->lineNum = apm.lineNum;
                 this->ColNume = apm.ColNume;
                 this->TypeName = apm.TypeName;
@@ -208,6 +263,14 @@ class AllocationPointMeta
                 this->Hash2 = apm.Hash2;
                 this->AllocatorName = apm.AllocatorName;
                 this->Valid = apm.Valid;
+                this->CallerName =      apm.CallerName;
+                this->IRInstID =        apm.IRInstID;
+                this->IRBBID =          apm.IRBBID;
+                this->MCInstID =        apm.MCInstID;
+                this->MCBBID  =         apm.MCBBID;
+                this->TID =             apm.TID;
+                this->InlinedColNume =  apm.InlinedColNume;
+                this->InlinedlineNum =  apm.InlinedlineNum;
                 // return the existing object so we can chain this operator
                 return *this;
         }

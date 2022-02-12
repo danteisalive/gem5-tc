@@ -215,7 +215,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
                 tokens.push_back(token);
             }
 
-            assert(tokens.size() == 9 && "Tokens size is not equal to 9!\n" );
+            assert(tokens.size() == 14 && "Tokens size is not equal to 14!\n" );
 
             
             // by the time we are here, APSIZE always should be zero! 
@@ -235,16 +235,41 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             PARENTTYPE = "";
             METAID = "";
 
+            /*METAID 
+                CWE843_Type_Confusion__char_82a.cpp#
+                35#
+                55#
+                class CWE843_Type_Confusion__char_82::CWE843_Type_Confusion__char_82_bad#
+                23505240#
+                3368523464000242366#
+                2501942056580049717#
+                _Znwm#
+                _ZN30CWE843_Type_Confusion__char_823badEv#
+                35#
+                55#
+                23236960#
+                23324768#
+                2
+            */   
+
             AllocationPointMeta _AllocPointMeta = AllocationPointMeta
                                                 (
                                                     tokens[0], // FileName
                                                     ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
                                                     ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
-                                                    (tokens[3]), // TypeName
                                                     ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
                                                     ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
                                                     ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
-                                                    (tokens[7]) //Allocator Name
+                                                    ((tokens[9].size() != 0) ? std::stoull(tokens[9]) : 0), // inlined line 
+                                                    ((tokens[10].size() != 0) ? std::stoull(tokens[10]) : 0), // inclined column 
+                                                    ((tokens[11].size() != 0) ? std::stoull(tokens[11]) : 0), // BB ID
+                                                    ((tokens[12].size() != 0) ? std::stoull(tokens[12]) : 0), // IR ID
+                                                    ((tokens[13].size() != 0) ? std::stoull(tokens[13]) : 0), // TID
+                                                    (0), // MCBBID
+                                                    (0), // MCInstID
+                                                    (tokens[7]), //Allocator Name
+                                                    (tokens[3]), // TypeName
+                                                    (tokens[8]) //Caller Name
                                                 );
             
 
@@ -349,7 +374,7 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
 
 
         size_t loc = 0;
-        loc = s1.find("TYCHE_TYCHE_SYMS#", 0);
+        loc = s1.find("TYCHE_SYMS#", 0);
         if (loc == std::string::npos) continue;
 
         DPRINTF(TypeMetadata, "TYCHE Symbol Addr: %x Mangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
@@ -384,7 +409,7 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
     {
 
         // seperate the information by #
-        std::string input = sym.second.substr(17, sym.second.size() - 1);
+        std::string input = sym.second.substr(11, sym.second.size() - 1);
         std::istringstream ss(input);
         std::string token;
         std::vector<std::string> tokens;
@@ -392,27 +417,81 @@ bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
             tokens.push_back(token);
         }
 
-        assert(tokens.size() == 6 && "Tokens size is not equal to 6!\n" );
+        if (tokens.size() != 16)
+        {
+            DPRINTF(TypeMetadata, "SYM: %s\n", input);
+            for (size_t i = 0; i < tokens.size(); i++)
+            {
+
+                DPRINTF(TypeMetadata, "Tokens[%d] = %s\n", i, tokens[i]);
+            }
+            
+            assert(tokens.size() == 16 && "Tokens size is not equal to 6!\n" );
+
+        }
+
 
         DPRINTF(TypeMetadata, "Tokens[0]: %s "
                               "Tokens[1]: %s " 
                               "Tokens[2]: %s "
                               "Tokens[3]: %s "
                               "Tokens[4]: %s "
-                              "Tokens[5]: %s\n",
-                              tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5]);
+                              "Tokens[5]: %s "
+                              "Tokens[6]: %s "
+                              "Tokens[7]: %s "
+                              "Tokens[8]: %s "
+                              "Tokens[9]: %s "
+                              "Tokens[10]: %s "
+                              "Tokens[11]: %s "
+                              "Tokens[12]: %s "
+                              "Tokens[13]: %s "
+                              "Tokens[14]: %s "
+                              "Tokens[15]: %s\n",
+                              tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5],
+                              tokens[6],tokens[7],tokens[8],tokens[9],tokens[10],tokens[11],
+                              tokens[12],tokens[13],tokens[14],tokens[15]);
 
-        AllocationPointMeta AllocPointMeta = AllocationPointMeta(
+/*
+TYCHE_SYMS#
+    CWE843_Type_Confusion__char_82a.cpp#
+    35#
+    55#
+    23505240#
+    3368523464000242366#
+    2501942056580049717#
+    35#
+    55#
+    23236960#
+    23324768#
+    2#
+    23324768#
+    23236960#
+    _Znwm#
+    class CWE843_Type_Confusion__char_82::CWE843_Type_Confusion__char_82_bad#
+    _ZN30CWE843_Type_Confusion__char_823badEv#
+*/
+     
+        AllocationPointMeta _AllocPointMeta = AllocationPointMeta
+                                                (
                                                     tokens[0], // FileName
-                                                    ((tokens[4].size() != 0) ? std::stoi(tokens[4]) : 0), // line 
-                                                    ((tokens[5].size() != 0) ? std::stoi(tokens[5]) : 0), // column
-                                                    (""), // TypeName
-                                                    (0), // ConstValue
-                                                    ((tokens[2].size() != 0) ? std::stoull(tokens[2]) : 0), // Hash1
-                                                    ((tokens[3].size() != 0) ? std::stoull(tokens[3]) : 0), // Hash2
-                                                    (tokens[1]) // Allocator Name
+                                                    ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
+                                                    ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                    ((tokens[3].size() != 0) ? std::stoull(tokens[3]) : 0), // ConstValue
+                                                    ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // Hash1
+                                                    ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash2
+                                                    ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // inlined line 
+                                                    ((tokens[7].size() != 0) ? std::stoull(tokens[7]) : 0), // inclined column 
+                                                    ((tokens[8].size() != 0) ? std::stoull(tokens[8]) : 0), // BB ID
+                                                    ((tokens[9].size() != 0) ? std::stoull(tokens[9]) : 0), // IR ID
+                                                    ((tokens[10].size() != 0) ? std::stoull(tokens[10]) : 0), // TID
+                                                    ((tokens[11].size() != 0) ? std::stoull(tokens[11]) : 0), // MC BB ID
+                                                    ((tokens[12].size() != 0) ? std::stoull(tokens[12]) : 0), // MC Inst. ID
+                                                    (tokens[13]), //Allocator Name                                                    
+                                                    (tokens[14]), // TypeName
+                                                    (tokens[15]) //Caller Name
                                                 );
-        tc->AllocationPointMetaBuffer.insert(std::make_pair(sym.first, AllocPointMeta));
+
+        tc->AllocationPointMetaBuffer.insert(std::make_pair(sym.first, _AllocPointMeta));
     }
 
     return true;
