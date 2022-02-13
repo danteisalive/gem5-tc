@@ -99,7 +99,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
         
         if (key == "FILENAME") 
         {
-            answer = line.substr(10, line.size() - 1);
+            answer = line.substr(9, line.size() - 1);
             DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
 
             type_metadata_info.SetFileName(answer);
