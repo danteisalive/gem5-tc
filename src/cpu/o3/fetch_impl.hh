@@ -1288,10 +1288,10 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               TheISA::PointerID pid = si->injectCheckMicroops(cpu->PointerDepGraph.getFetchArchRegsPidArray());
               if (pid != TheISA::PointerID(0) /*|| si->getNumOfMicroops() <= thisPC.microPC()*/)
               {
-                  si->injectMicroops(tc, 
-                                   thisPC,
-                                   TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, -1),
-                                   pid);
+                //   si->injectMicroops(tc, 
+                //                    thisPC,
+                //                    TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, -1),
+                //                    pid);
               }
               else {
                 //check to see if there is injecteion from before

@@ -73,7 +73,9 @@
         "scoped_allocator": "cpp",
         "shared_mutex": "cpp",
         "valarray": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "map": "cpp",
+        "set": "cpp"
     },
     "cmake.configureOnOpen": false
 }

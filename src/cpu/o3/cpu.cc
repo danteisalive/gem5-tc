@@ -442,7 +442,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         readTypeMetadata("allocation_points.hash", o3_tc);
 
         DPRINTF(TypeMetadata, "DUMPING ALL THE METADATA INFORMATION\n");
-        for (auto const &elem: tc->VirtualTablesBuffer)
+        for (auto const &elem: o3_tc->VirtualTablesBuffer)
         {
             DPRINTF(TypeMetadata, "Virtual Table Address: %x\n", elem.first);
             for (auto const& vtable: elem.second)
@@ -582,7 +582,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         }
 
-        assert(0);
+        //assert(0);
 
 
 

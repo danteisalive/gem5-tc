@@ -59,6 +59,7 @@
 #include "sim/faults.hh"
 #include "sim/full_system.hh"
 #include "sim/system.hh"
+#include "debug/TypeMetadata.hh"
 
 using namespace std;
 using namespace TheISA;
@@ -101,24 +102,7 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->num_of_allocations = 0;
 
     max_insts_any_thread = p->max_insts_any_thread;
-    // if (p->symbol_file != ""){
-    //     std::string line;
-    //     std::ifstream myfile (threadContexts[0]->symbolsFile);
-    //     if (myfile.is_open()){
-    //         Addr pcAddr;
-    //         Addr type_id;
-    //         uint64_t checkType;
-    //         while ( std::getline (myfile,line) ){
-    //             std::istringstream iss(line);
-    //             iss >> std::hex >> pcAddr  >> checkType >> type_id;
-    //             (threadContexts[0]->syms_cache).insert(
-    //                       std::pair<Addr, TheISA::TyCHEAllocationPoint>
-    //                       (pcAddr, TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)checkType, (int64_t)type_id)));
-    //         }
-    //         myfile.close();
-    //     }
-    //     else fatal("Can't open symbols file");
-    // }
+
 
     std::cout << "Atomic CPU Initilization: " << std::endl;
     threadContexts[0]->interval_tree = VG_newFM(interval_tree_Cmp);
@@ -144,16 +128,155 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
       warn("cannot read symtab!");
     }
 
+
+    // Load Virtual Tables and TyCHE symbols
+    readVirtualTable(seglist[seglist.size()-1].c_str(), threadContexts[0]);
+    readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), threadContexts[0]);
+    readTypeMetadata("allocation_points.hash", threadContexts[0]);
+
+    DPRINTF(TypeMetadata, "DUMPING ALL THE METADATA INFORMATION\n");
+    for (auto const &elem: threadContexts[0]->VirtualTablesBuffer)
+    {
+        DPRINTF(TypeMetadata, "Virtual Table Address: %x\n", elem.first);
+        for (auto const& vtable: elem.second)
+        {
+            DPRINTF(TypeMetadata, "VT Entry: %s\n", vtable);
+        }
+        DPRINTF(TypeMetadata, "\n\n");
+
+    }
+
+    for (int i = 0; i < threadContexts[0]->TypeMetaDataBuffer.size(); i++)
+    {
+        DPRINTF(TypeMetadata, "DUMPING TypeMetaDataBuffer:\n %s", threadContexts[0]->TypeMetaDataBuffer[i]);
+    }
+
+    for (auto const & elem : threadContexts[0]->AllocationPointMetaBuffer)
+    {
+        DPRINTF(TypeMetadata, "DUMPING AllocationPointMetaBuffer:\n %s", elem.second);
+    }
+
     UWord keyW, valW;
     VG_initIterFM(threadContexts[0]->FunctionSymbols);
-    while (
-        VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
-       Block* bk = (Block*)keyW;
-       assert(valW == 0);
-       assert(bk);
-       std::cout << std::hex << bk->payload << " " << bk->name << std::endl;
+    while (VG_nextIterFM(threadContexts[0]->FunctionSymbols, &keyW, &valW )) {
+        Block* bk = (Block*)keyW;
+        assert(valW == 0);
+        assert(bk);
+        DPRINTF(TypeMetadata, "DUMPING Function to Track:\n %x::%s", bk->payload, bk->name);
     }
-    VG_doneIterFM( threadContexts[0]->FunctionSymbols );
+    VG_doneIterFM(threadContexts[0]->FunctionSymbols );
+
+    //populate syms_cache
+    for (auto const & elem : threadContexts[0]->AllocationPointMetaBuffer)
+    {
+        std::string AllocatorName = elem.second.GetAllocatorName();
+        assert( (AllocatorName == "malloc" || 
+                    AllocatorName == "calloc" ||
+                    AllocatorName == "realloc" ||
+                    AllocatorName == "free" || 
+                    AllocatorName == "_ZdlPv" || // delete
+                    AllocatorName == "_ZdaPv" || // delete []
+                    AllocatorName == "_Znwm" ||
+                    AllocatorName == "_Znam" ||
+                    AllocatorName == "_ZnwmRKSt9nothrow_t" ||
+                    AllocatorName == "_ZnamRKSt9nothrow_t") &&
+                    "Undefined Allocator Name!\n"
+                    );
+            
+        TheISA::TyCHEAllocationPoint::CheckType EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID;
+        TheISA::TyCHEAllocationPoint::CheckType ExitCheckType  = TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID;
+        if (AllocatorName == "malloc" || 
+                AllocatorName == "_Znwm" ||
+                AllocatorName == "_Znam" )
+        {
+            EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT;
+            ExitCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT;
+        } 
+        else if (AllocatorName == "_ZnwmRKSt9nothrow_t" ||
+                AllocatorName == "_ZnamRKSt9nothrow_t")
+        {
+            // it has two input arguments. Needs special collectors to be defined!
+            assert(false && "_ZnwmRKSt9nothrow_t type!\n");
+        }   
+        else if (AllocatorName == "calloc")
+        {
+            EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT;
+            ExitCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT;
+        }
+        else if (AllocatorName == "realloc")
+        {
+            EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT;
+            ExitCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT;
+        }
+        else if (AllocatorName == "free" || 
+                AllocatorName == "_ZdlPv" || // delete
+                AllocatorName == "_ZdaPv") // delete []) 
+        {
+            EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL;
+        }
+
+        assert(EntryCheckType != TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID && 
+                  "Invalid type of allocator!\n" );
+            
+        // we need two collectors for these APs. Size and Base
+        if (EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT || 
+            EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT || 
+            EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT)
+        {
+                (threadContexts[0]->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx EntryCheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType),
+                    elem.second
+                );
+                (threadContexts[0]->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first + 5, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx ExitCheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType),
+                    elem.second
+                );
+        }
+        // just one entry for these types
+        else if (EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL)
+        {
+                (threadContexts[0]->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx CheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType),
+                    elem.second
+                );
+        }
+        else 
+        {
+                assert(0);
+        }
+
+
+
+        
+
+    }
+
+    assert(0);
+
 }
 
 
