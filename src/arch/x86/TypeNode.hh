@@ -69,8 +69,8 @@
 #include <map>
 
 #include "cpu/simple/WordFM.hh"
-#include "cpu/static_inst.hh"
-#include "cpu/thread_context.hh"
+// #include "cpu/static_inst.hh"
+//#include "cpu/thread_context.hh"
 #include "mem/page_table.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
@@ -121,6 +121,7 @@ class AllocationPointMeta
         uint64_t GetConstValue() const {return ConstValue;}
         uint64_t GetHash1() const {return Hash1;}
         uint64_t GetHash2() const {return Hash2;}
+        std::string GetAllocatorName() const {return AllocatorName;}
 
     public:
         AllocationPointMeta() {
@@ -278,6 +279,95 @@ class AllocationPointMeta
 
 
 
+
+class TyCHEAllocationPoint : public AllocationPointMeta {
+        public:
+            enum CheckType {
+                AP_INVALID              = 0x0,
+                AP_IGONRE               = 0x1,
+                AP_BOUNDS_INJECT        = 0xd,
+                AP_MALLOC_BASE_COLLECT  = 0xb,
+                AP_MALLOC_SIZE_COLLECT  = 0xc,
+                AP_FREE_CALL            = 0xe,
+                AP_FREE_RET             = 0xf,
+                AP_CALLOC_BASE_COLLECT  = 0x10,
+                AP_CALLOC_SIZE_COLLECT  = 0x11,
+                AP_REALLOC_BASE_COLLECT = 0x12,
+                AP_REALLOC_SIZE_COLLECT  = 0x13
+            };
+
+        private:
+            CheckType ap_type;
+            //AllocationPointMeta    ap_typeid;
+
+   
+        public:
+        
+            TyCHEAllocationPoint()
+            {
+                ap_type = CheckType::AP_INVALID;
+            }
+            TyCHEAllocationPoint(CheckType _ap_type, AllocationPointMeta _ap_typeid)
+            :  AllocationPointMeta(_ap_typeid), ap_type(_ap_type)
+            {
+
+            }
+
+            // copy constructor
+            TyCHEAllocationPoint(const TyCHEAllocationPoint& empl)
+               : AllocationPointMeta(empl), ap_type(empl.ap_type)
+            {
+
+            }
+
+            //copy assignment
+            TyCHEAllocationPoint& operator = (const TyCHEAllocationPoint & impl)
+            {
+                if (&impl == this)
+                    return *this;
+                
+                (AllocationPointMeta&)(*this) = impl; 
+                this->ap_type = impl.ap_type;
+
+                return *this;
+            }
+
+
+            CheckType               GetCheckType() const {return ap_type;}
+            static std::string      CheckTypeToStr(CheckType type)
+            {
+                switch (type) {
+                    case CheckType::AP_IGONRE:
+                        return "AP_IGONRE";
+                    case CheckType::AP_INVALID:
+                        return "AP_INVALID";
+                    case CheckType::AP_MALLOC_BASE_COLLECT:
+                        return "AP_MALLOC_BASE_COLLECT";
+                    case CheckType::AP_MALLOC_SIZE_COLLECT:
+                        return "AP_MALLOC_SIZE_COLLECT";
+                    case CheckType::AP_BOUNDS_INJECT:
+                        return "AP_BOUNDS_INJECT";
+                    case CheckType::AP_FREE_CALL:
+                        return "AP_FREE_CALL";
+                    case CheckType::AP_FREE_RET:
+                        return "AP_FREE_RET";
+                    case CheckType::AP_CALLOC_BASE_COLLECT:
+                        return "AP_CALLOC_BASE_COLLECT";
+                    case CheckType::AP_CALLOC_SIZE_COLLECT:
+                        return "AP_CALLOC_SIZE_COLLECT";
+                    case CheckType::AP_REALLOC_BASE_COLLECT:
+                        return "AP_REALLOC_BASE_COLLECT";
+                    case CheckType::AP_REALLOC_SIZE_COLLECT:
+                        return "AP_REALLOC_SIZE_COLLECT";
+                    default:
+                    {
+                        assert(0);
+                        return "Unrecognized Check!";
+                    }
+                }
+        }
+                    
+};
 
 class TypeEntryInfo
 {

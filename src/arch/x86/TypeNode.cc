@@ -56,7 +56,7 @@
 #include <bits/stdc++.h>
 #include <unordered_map>
 #include <queue>
-
+#include "cpu/thread_context.hh"
 
 namespace X86ISA {
 
@@ -627,7 +627,7 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
         else 
         {
             DPRINTF(TypeMetadata, "Symbol: %s\n", symbol.second);
-            assert("A symbole that starts with _ZTV!\n");
+            assert("A symbol that starts with _ZTV!\n");
         }
     }
 

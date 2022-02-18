@@ -410,29 +410,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
                         tid, params->symbol_file);
 
-        if (params->symbol_file != ""){
-            std::string line;
-            std::ifstream myfile (params->symbol_file);
-            if (myfile.is_open()){
-                Addr pcAddr;
-                Addr type_id;
-                uint64_t checkType;
-                while ( std::getline (myfile,line) ){
-                    std::istringstream iss(line);
-                    iss >> std::hex >> pcAddr  >> checkType >> type_id;
-                    (o3_tc->syms_cache).insert(
-                          std::pair<Addr, TheISA::TyCHEAllocationPoint>
-                          (pcAddr, TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)checkType, (int64_t)type_id)));
 
-                    DPRINTF(Capability,
-                      "line:'%s' PCAddr: %#lx CheckType: %s\n",
-                      line, pcAddr,
-                      TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)checkType));
-                }
-                myfile.close();
-            }
-            else fatal("Can't open symbols file");
-        }
 
 
         NumOfAliasTableAccess = 0;
@@ -463,6 +441,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), o3_tc);
         readTypeMetadata("allocation_points.hash", o3_tc);
 
+        DPRINTF(TypeMetadata, "DUMPING ALL THE METADATA INFORMATION\n");
         for (auto const &elem: tc->VirtualTablesBuffer)
         {
             DPRINTF(TypeMetadata, "Virtual Table Address: %x\n", elem.first);
@@ -483,19 +462,129 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         {
             DPRINTF(TypeMetadata, "DUMPING AllocationPointMetaBuffer:\n %s", elem.second);
         }
+
+        UWord keyW, valW;
+        VG_initIterFM(o3_tc->FunctionSymbols);
+        while (VG_nextIterFM(o3_tc->FunctionSymbols, &keyW, &valW )) {
+            Block* bk = (Block*)keyW;
+            assert(valW == 0);
+            assert(bk);
+            DPRINTF(TypeMetadata, "DUMPING Function to Track:\n %x::%s", bk->payload, bk->name);
+        }
+        VG_doneIterFM(o3_tc->FunctionSymbols );
+
+        //populate syms_cache
+        for (auto const & elem : o3_tc->AllocationPointMetaBuffer)
+        {
+            std::string AllocatorName = elem.second.GetAllocatorName();
+            assert( (AllocatorName == "malloc" || 
+                    AllocatorName == "calloc" ||
+                    AllocatorName == "realloc" ||
+                    AllocatorName == "free" || 
+                    AllocatorName == "_ZdlPv" || // delete
+                    AllocatorName == "_ZdaPv" || // delete []
+                    AllocatorName == "_Znwm" ||
+                    AllocatorName == "_Znam" ||
+                    AllocatorName == "_ZnwmRKSt9nothrow_t" ||
+                    AllocatorName == "_ZnamRKSt9nothrow_t") &&
+                    "Undefined Allocator Name!\n"
+                    );
+            
+            TheISA::TyCHEAllocationPoint::CheckType EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID;
+            TheISA::TyCHEAllocationPoint::CheckType ExitCheckType  = TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID;
+            if (AllocatorName == "malloc" || 
+                AllocatorName == "_Znwm" ||
+                AllocatorName == "_Znam" )
+            {
+                EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT;
+                ExitCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT;
+            } 
+            else if (AllocatorName == "_ZnwmRKSt9nothrow_t" ||
+                    AllocatorName == "_ZnamRKSt9nothrow_t")
+            {
+                // it has two input arguments. Needs special collectors to be defined!
+                assert(false && "_ZnwmRKSt9nothrow_t type!\n");
+            }   
+            else if (AllocatorName == "calloc")
+            {
+                EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT;
+                ExitCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT;
+            }
+            else if (AllocatorName == "realloc")
+            {
+                EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT;
+                ExitCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT;
+            }
+            else if (AllocatorName == "free" || 
+                     AllocatorName == "_ZdlPv" || // delete
+                     AllocatorName == "_ZdaPv") // delete []) 
+            {
+                EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL;
+            }
+
+            assert(EntryCheckType != TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID && 
+                  "Invalid type of allocator!\n" );
+            
+            // we need two collectors for these APs. Size and Base
+            if (EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT || 
+                EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT || 
+                EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT)
+            {
+                (o3_tc->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx EntryCheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType),
+                    elem.second
+                );
+                (o3_tc->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first + 5, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx ExitCheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType),
+                    elem.second
+                );
+            }
+            // just one entry for these types
+            else if (EntryCheckType == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL)
+            {
+                (o3_tc->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx CheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType),
+                    elem.second
+                );
+            }
+            else 
+            {
+                assert(0);
+            }
+
+
+
         
+
+        }
+
         assert(0);
 
-         // UWord keyW, valW;
-         // VG_initIterFM(o3_tc->FunctionSymbols);
-         // while (VG_nextIterFM(o3_tc->FunctionSymbols, &keyW, &valW )) {
-         //    Block* bk = (Block*)keyW;
-         //    assert(valW == 0);
-         //    assert(bk);
-         //    std::cout << std::hex << bk->payload << " " <<
-         //                bk->name << std::endl;
-         // }
-         // VG_doneIterFM(o3_tc->FunctionSymbols );
+
 
         // Setup quiesce event.
         this->thread[tid]->quiesceEvent = new EndQuiesceEvent(tc);

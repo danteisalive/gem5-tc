@@ -36,6 +36,7 @@
 #include <memory>
 #include <string>
 
+
 #include "arch/registers.hh"
 #include "arch/types.hh"
 #include "base/logging.hh"
@@ -49,6 +50,7 @@
 #include "enums/StaticInstFlags.hh"
 #include "mem/request.hh"
 #include "sim/byteswap.hh"
+#include "arch/TypeNode.hh"
 
 // forward declarations
 class Packet;

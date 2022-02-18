@@ -47,13 +47,14 @@
 #include "base/bitunion.hh"
 #include "base/cprintf.hh"
 #include "base/types.hh"
+//#include "arch/TypeNode.hh"
 #include "sim/serialize.hh"
 #include "debug/Capability.hh"
 
 namespace X86ISA
 {
 
-
+  //class AllocationPointMeta;
 
   class PointerID
   {
@@ -521,76 +522,6 @@ namespace X86ISA
 
 
 
-
-    class TyCHEAllocationPoint {
-        public:
-            enum CheckType {
-                AP_IGONRE               = 0x0,
-                AP_BOUNDS_INJECT        = 0xd,
-                AP_MALLOC_BASE_COLLECT  = 0xb,
-                AP_MALLOC_SIZE_COLLECT  = 0xc,
-                AP_FREE_CALL            = 0xe,
-                AP_FREE_RET             = 0xf,
-                AP_CALLOC_BASE_COLLECT  = 0x10,
-                AP_CALLOC_SIZE_COLLECT  = 0x11,
-                AP_REALLOC_BASE_COLLECT = 0x12,
-                AP_REALLOC_SIZE_COLLECT  = 0x13
-            };
-
-            typedef int64_t TypeID;
-
-        private:
-            CheckType ap_type;
-            TypeID    ap_typeid;
-
-   
-        public:
-        
-            TyCHEAllocationPoint()
-            {
-                ap_type = CheckType::AP_IGONRE;
-                ap_typeid = -1;
-            }
-            TyCHEAllocationPoint(CheckType _ap_type, TypeID _ap_typeid)
-            {
-                ap_type = _ap_type;
-                ap_typeid = _ap_typeid;
-            }
-        
-            CheckType getCheckType(){return ap_type;}
-            TypeID    getTypeID() {return ap_typeid;}
-            static std::string CheckTypeToStr(CheckType type)
-            {
-                switch (type) {
-                    case CheckType::AP_IGONRE:
-                        return "AP_IGONRE";
-                    case CheckType::AP_MALLOC_BASE_COLLECT:
-                        return "AP_MALLOC_BASE_COLLECT";
-                    case CheckType::AP_MALLOC_SIZE_COLLECT:
-                        return "AP_MALLOC_SIZE_COLLECT";
-                    case CheckType::AP_BOUNDS_INJECT:
-                        return "AP_BOUNDS_INJECT";
-                    case CheckType::AP_FREE_CALL:
-                        return "AP_FREE_CALL";
-                    case CheckType::AP_FREE_RET:
-                        return "AP_FREE_RET";
-                    case CheckType::AP_CALLOC_BASE_COLLECT:
-                        return "AP_CALLOC_BASE_COLLECT";
-                    case CheckType::AP_CALLOC_SIZE_COLLECT:
-                        return "AP_CALLOC_SIZE_COLLECT";
-                    case CheckType::AP_REALLOC_BASE_COLLECT:
-                        return "AP_REALLOC_BASE_COLLECT";
-                    case CheckType::AP_REALLOC_SIZE_COLLECT:
-                        return "AP_REALLOC_SIZE_COLLECT";
-                    default:
-                    {
-                        assert(0);
-                        return "Unrecognized Check!";
-                    }
-                }
-        }
-                    
-    };
 
 
 

@@ -117,12 +117,13 @@ class ThreadContext
     typedef TheISA::CCReg CCReg;
     typedef TheISA::MiscReg MiscReg;
     typedef TheISA::TypeMetadataInfo TypeMetadataInfo;
+    typedef TheISA::TyCHEAllocationPoint TyCHEAllocationPoint;
     using VecRegContainer = TheISA::VecRegContainer;
     using VecElem = TheISA::VecElem;
   public:
 
     //Addr here is the AP/DP point address
-    typedef std::map<Addr,  TheISA::TyCHEAllocationPoint>       SymbolCache;
+    typedef std::map<Addr, TyCHEAllocationPoint>       SymbolCache;
     typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>   ShadowMemoryAliasTable;
     typedef std::map<Addr, TheISA::AllocationPointMeta>          AllocationPointMetaTable;
     typedef std::map<Addr, std::vector<std::string>>            VirtualTables; 

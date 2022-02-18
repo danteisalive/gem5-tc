@@ -101,24 +101,24 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     threadContexts[0]->num_of_allocations = 0;
 
     max_insts_any_thread = p->max_insts_any_thread;
-    if (p->symbol_file != ""){
-        std::string line;
-        std::ifstream myfile (threadContexts[0]->symbolsFile);
-        if (myfile.is_open()){
-            Addr pcAddr;
-            Addr type_id;
-            uint64_t checkType;
-            while ( std::getline (myfile,line) ){
-                std::istringstream iss(line);
-                iss >> std::hex >> pcAddr  >> checkType >> type_id;
-                (threadContexts[0]->syms_cache).insert(
-                          std::pair<Addr, TheISA::TyCHEAllocationPoint>
-                          (pcAddr, TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)checkType, (int64_t)type_id)));
-            }
-            myfile.close();
-        }
-        else fatal("Can't open symbols file");
-    }
+    // if (p->symbol_file != ""){
+    //     std::string line;
+    //     std::ifstream myfile (threadContexts[0]->symbolsFile);
+    //     if (myfile.is_open()){
+    //         Addr pcAddr;
+    //         Addr type_id;
+    //         uint64_t checkType;
+    //         while ( std::getline (myfile,line) ){
+    //             std::istringstream iss(line);
+    //             iss >> std::hex >> pcAddr  >> checkType >> type_id;
+    //             (threadContexts[0]->syms_cache).insert(
+    //                       std::pair<Addr, TheISA::TyCHEAllocationPoint>
+    //                       (pcAddr, TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)checkType, (int64_t)type_id)));
+    //         }
+    //         myfile.close();
+    //     }
+    //     else fatal("Can't open symbols file");
+    // }
 
     std::cout << "Atomic CPU Initilization: " << std::endl;
     threadContexts[0]->interval_tree = VG_newFM(interval_tree_Cmp);
@@ -922,7 +922,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
     SimpleExecContext& t_info = *threadInfo[0];
     SimpleThread* thread = t_info.thread;
 
-    if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT){
+    if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT){
 
       if (threadContexts[0]->Collector_Status !=
           ThreadContext::COLLECTOR_STATUS::NONE)
@@ -945,7 +945,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       }
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT){
 
       if (threadContexts[0]->Collector_Status !=
                             ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
@@ -974,7 +974,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       _tc->PointerTracker[X86ISA::INTREG_RAX] = bk->pid;
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT){
 
       if (threadContexts[0]->Collector_Status !=
           ThreadContext::COLLECTOR_STATUS::NONE)
@@ -994,7 +994,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       }
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT){
 
        if (threadContexts[0]->Collector_Status !=
                         ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE)
@@ -1040,7 +1040,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
        }
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL){
 
       uint64_t base_addr = thread->readIntReg(X86ISA::INTREG_RDI);
       // logs
@@ -1106,13 +1106,13 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       }
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_RET){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_RET){
 
       //threadContexts[0]->Collector_Status =
       //              ThreadContext::COLLECTOR_STATUS::NONE;
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT){
 
       if (threadContexts[0]->Collector_Status !=
           ThreadContext::COLLECTOR_STATUS::NONE)
@@ -1183,7 +1183,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
       }
 
     }
-    else if (_sym.getCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT){
 
       if (threadContexts[0]->Collector_Status !=
                         ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
