@@ -1288,18 +1288,25 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
               TheISA::PointerID pid = si->injectCheckMicroops(cpu->PointerDepGraph.getFetchArchRegsPidArray());
               if (pid != TheISA::PointerID(0) /*|| si->getNumOfMicroops() <= thisPC.microPC()*/)
               {
-                //   si->injectMicroops(tc, 
-                //                    thisPC,
-                //                    TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, -1),
-                //                    pid);
+                  // Use PC Address inside the PointerID to find the AllocationPointMetadata
+                  uint64_t tid  = pid.GetTypeID();
+                  assert(tid != 0 && "NULL TID for a non-zero PID!\n");
+                  assert(tc->syms_cache.find(tid) != tc->syms_cache.end() && "Cannot find the symbol in the syms_cache!\n");
+
+                  TheISA::TyCHEAllocationPoint tyche_ap = tc->syms_cache[tid];
+                  assert((tyche_ap.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT ||
+                          tyche_ap.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT ||
+                          tyche_ap.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT) && 
+                          "Invalid type at injection point!\n");
+
+                  auto APMetadata = static_cast<TheISA::AllocationPointMeta>(tyche_ap);
+
+                  si->injectMicroops(tc, 
+                                   thisPC,
+                                   TheISA::TyCHEAllocationPoint(TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT, APMetadata),
+                                   pid);
               }
-              else {
-                //check to see if there is injecteion from before
-                // if (si->hasInjection()){
-                //     si->setMacroopPid(TheISA::PointerID(0));
-                //     std::cout << "hasInjection\n";
-                // }
-              }
+              
 
 
         }
@@ -1334,20 +1341,20 @@ bool
 DefaultFetch<Impl>::InjectBoundsCheck(ThreadContext * tc, TheISA::PCState &thisPC) {
 
     Block fake;
-    fake.payload = (Addr)thisPC.pc();
+    fake.payload = thisPC.pc();
     fake.req_szB = 1;
     UWord foundkey = 1;
     UWord foundval = 1;
-    unsigned char found = VG_lookupFM(tc->FunctionsToIgnore,
+    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
                                     &foundkey, &foundval, (UWord)&fake );
 
     if (found)
     {
-      return false;
+      return true;
     }
     else
     {
-      return true;
+      return false;
     }
 }
 
