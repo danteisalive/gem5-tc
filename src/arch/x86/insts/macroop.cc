@@ -104,8 +104,6 @@ TheISA::PointerID MacroopBase::injectCheckMicroops(
           // for all the load and stores inject check microop,
           if (microops[i]->isLoad() || microops[i]->isStore())
           {
-              //rule #1: all load and stores are integer microops!
-            //   assert(microops[i]->isInteger());
               // we can filter explicit load/stores to stack
               // there are some implicit stack loads/stores which we don't want
             //   if (microops[i]->getBase() == X86ISA::INTREG_RSP)

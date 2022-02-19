@@ -613,80 +613,79 @@ class TypeMetadataInfo
 
 
 
-  class PointerID
-  {
-  private:
-      uint64_t id;
+class PointerID
+{
+    private:
+        uint64_t PID;
+        uint64_t TID;
 
-  public:
+    public:
 
-      PointerID(){
-          id = 0;
-      }
+        PointerID()
+        {
+            PID = 0;
+            TID = 0;
+        }
 
-      PointerID(uint64_t _id){
-          id = _id;
-      }
+        PointerID(uint64_t _PID)
+        {
+            PID = _PID;
+            TID = 0;
+        }
+        
+        PointerID(uint64_t _PID, uint64_t _TID)
+        {
+            PID = _PID;
+            TID = _TID;
+        }
 
+        ~PointerID()
+        {
 
-      ~PointerID()
-      {
+        }
 
-      }
+        bool operator != (const PointerID& _pid){
+            return (PID != _pid.PID);
+        }
 
-      bool operator != (const PointerID& _pid){
-          return (id != _pid.id);
-      }
-
-      bool operator == (const PointerID& _pid){
-          return (id == _pid.id);
-      }
-
-
-          // A better implementation of operator=
-      PointerID& operator = (const PointerID& _pid)
-          {
-              // self-assignment guard
-              if (this == &_pid)
-                  return *this;
-
-              // do the copy
-              this->id = _pid.id;
-              // return the existing object so we can chain this operator
-              return *this;
-      }
-
-      bool operator < (const PointerID& rhs) const {
-
-          return (this->id < rhs.id);
-      }
-
-      PointerID operator + (uint64_t _val)
-      {
-          this->id += _val;
-          PointerID temp(*this);
-          //temp.id += _val;
-
-          return temp;
-
-      }
-
-      PointerID& operator += (const uint64_t& _rhs)
-      {
-          this->id += _rhs;
-          return *this;
-      }
-
-      PointerID(const PointerID& _PID)
-      {
-          this->id = _PID.id;
-      }
-
-      void        setPID(uint64_t _id) { id = _id; }
-      uint64_t    getPID() const { return id; }
+        bool operator == (const PointerID& _pid){
+            return (PID == _pid.PID);
+        }
 
 
-  };
+            // A better implementation of operator=
+        PointerID& operator = (const PointerID& _pid)
+        {
+            // self-assignment guard
+            if (this == &_pid)
+                return *this;
+
+            // do the copy
+            this->PID   = _pid.PID;
+            this->TID   = _pid.TID;
+        
+            // return the existing object so we can chain this operator
+            return *this;
+        }
+
+        bool operator < (const PointerID& rhs) const {
+
+            return (this->PID < rhs.PID);
+        }
+
+        PointerID(const PointerID& _pid)
+        {
+            this->PID  = _pid.PID;
+            this->TID  = _pid.TID;
+        }
+
+        //void        SetTypeID(uint64_t _TypeID) { TypeID = _TypeID; }
+        uint64_t    GetTypeID() const { return TID; }
+
+        //void        SetPointerID(uint64_t _PointerID) { PointerID = _PointerID; }
+        uint64_t    GetPointerID() const { return PID; }
+
+};
 
 
 
@@ -939,7 +938,7 @@ class TypeMetadataInfo
             operator << (std::ostream & os, const PointerID & _pid)
     {
         ccprintf(os, "PID(%llu)",
-                _pid.getPID()
+                _pid.GetPointerID()
                 );
         return os;
     }

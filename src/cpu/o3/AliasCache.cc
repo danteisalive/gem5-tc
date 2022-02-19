@@ -502,7 +502,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                            it_lv2 = next_it_lv2)
                   {
                       ++next_it_lv2;
-                      if (it_lv2->second.getPID() == pid.getPID())
+                      if (it_lv2->second.GetPointerID() == pid.GetPointerID())
                       {
                         DPRINTF(AliasCache, " Invalidate:: Erasing EffAddr: 0x%x PID=%s from Sahdow Memory!\n", 
                                 it_lv2->first, it_lv2->second
@@ -523,7 +523,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                  it != ExeAliasTableBuffer.cend(); it = next_it)
         {
               ++next_it;
-              if (it->second.getPID() == pid.getPID())
+              if (it->second.GetPointerID() == pid.GetPointerID())
               {
                 ExeAliasTableBuffer.erase(it);
               }

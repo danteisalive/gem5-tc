@@ -172,11 +172,11 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
       {
           switch (localCtrs[lvpt_idx].read()) {
             case 0x0:
-              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.GetPointerID() +
                                       localBiases[lvpt_idx]);
               break;
             case 0x1:
-              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.getPID() +
+              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.GetPointerID() +
                                       localBiases[lvpt_idx]);
 
               break;
@@ -230,7 +230,7 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
 
 
     if (predict){
-      panic_if(predicted_pid.getPID() != target.getPID(),
+      panic_if(predicted_pid.GetPointerID() != target.GetPointerID(),
               "Inequal PID when Prediction is True!");
     }
     unsigned lvpt_idx = getIndex(instPC, tid);
@@ -272,29 +272,29 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
 
     //Capture prediction Miss History
     if (!predict){
-      predictorMissCount[lvpt_idx]++;
-      //add it to the debug_function_calls
-      // find the function which loaded a pointer
-      Block fake;
-      fake.payload = instPC;
-      fake.req_szB = 1;
-      UWord foundkey = 1;
-      UWord foundval = 1;
-      unsigned char found =
-             VG_lookupFM(tc->FunctionSymbols,
-                                  &foundkey, &foundval, (UWord)&fake );
-     if (found) {
-         Block* bk = (Block*)foundkey;
-         std::string str =
-            std::to_string(target.getPID()) +
-                    "(" + std::to_string(predicted_pid.getPID()) + ")";
-         predictorMissHistory[lvpt_idx][bk->name][instPC].push_back(str);
-     }
+        predictorMissCount[lvpt_idx]++;
+        //add it to the debug_function_calls
+        // find the function which loaded a pointer
+        Block fake;
+        fake.payload = instPC;
+        fake.req_szB = 1;
+        UWord foundkey = 1;
+        UWord foundval = 1;
+        unsigned char found =
+              VG_lookupFM(tc->FunctionSymbols,
+                                    &foundkey, &foundval, (UWord)&fake );
+      if (found) {
+          Block* bk = (Block*)foundkey;
+          std::string str =
+              std::to_string(target.GetPointerID()) +
+                      "(" + std::to_string(predicted_pid.GetPointerID()) + ")";
+          predictorMissHistory[lvpt_idx][bk->name][instPC].push_back(str);
+      }
     }
 
     //we dont want to pullote our cache with non refill loads but we need to
     // have the history
-    //if (target.getPID() == 0){
+    //if (target.GetPointerID() == 0){
         //either predicted true or false
     //    banList[lvpt_idx][instPC]++;
         //return;
@@ -346,7 +346,7 @@ DefaultLVPT::update(Addr instPC,
     // std::cout << std::hex << "Inst. " << instPC << " updated the LVPT." <<
     // " Before: " <<   lvpt[lvpt_idx].target << " After: " << target << "\n";
 
-    localBiases[lvpt_idx] = target.getPID() - lvpt[lvpt_idx].target.getPID();
+    localBiases[lvpt_idx] = target.GetPointerID() - lvpt[lvpt_idx].target.GetPointerID();
     lvpt[lvpt_idx].tid = tid;
     lvpt[lvpt_idx].valid = true;
     lvpt[lvpt_idx].target = target;
@@ -390,7 +390,7 @@ DefaultLVPT::squashAndUpdate(const InstSeqNum &squashed_sn,
 
     assert(pred_hist_it->second.lvptIdx == lvpt_idx);
 
-    //if (pred_hist_it->second.targetPID.getPID() != 0){
+    //if (pred_hist_it->second.targetPID.GetPointerID() != 0){
       lvpt[lvpt_idx].tag = history->lvptEntry.tag;
       lvpt[lvpt_idx].tid = history->lvptEntry.tid;
       lvpt[lvpt_idx].valid = history->lvptEntry.valid;
@@ -429,7 +429,7 @@ DefaultLVPT::squash(const InstSeqNum &squashed_sn, ThreadID tid)
 
           uint64_t lvpt_idx = pred_hist_it->second.lvptIdx;
 
-          //if (pred_hist_it->second.targetPID.getPID() != 0)
+          //if (pred_hist_it->second.targetPID.GetPointerID() != 0)
           //{
               lvpt[lvpt_idx].tag = history->lvptEntry.tag;
               lvpt[lvpt_idx].tid = history->lvptEntry.tid;
@@ -486,7 +486,7 @@ DefaultLVPT::updatePIDHistory(const InstSeqNum &done_sn, ThreadID tid)
             confLevel[pred_hist_it->second.lvptIdx].decrement();
         }
 
-        if (pred_hist_it->second.targetPID.getPID() != 0){
+        if (pred_hist_it->second.targetPID.GetPointerID() != 0){
             localPointerPredictor[pred_hist_it->second.lvptIdx].increment();
         }
         else {

@@ -566,7 +566,7 @@ DefaultFetch<Impl>::lookupAndUpdateLVPT(TheISA::PCState& thisPC ,
 
 
     if (_pid != TheISA::PointerID(0)){
-        tc->LRUPidCache.LRUPIDCache_Access(_pid.getPID());
+        tc->LRUPidCache.LRUPIDCache_Access(_pid.GetPointerID());
     }
 
     inst->setMacroopPid(_pid);
@@ -1562,18 +1562,25 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 TrackAlias(tc, thisPC.pc()))
             {
                 if (instruction->isMallocBaseCollectorMicroop() ||
-                    instruction->isCallocBaseCollectorMicroop() ||
-                    instruction->isReallocBaseCollectorMicroop())
+                    instruction->isCallocBaseCollectorMicroop() )
                 {
-                    instruction->dyn_pid = TheISA::PointerID(
-                                        cpu->readArchIntReg(X86ISA::INTREG_R16,
-                                        instruction->threadNumber) + 1);
+                    uint64_t _PID = cpu->readArchIntReg(X86ISA::INTREG_R16, instruction->threadNumber) + 1;
+                    uint64_t _TID = thisPC.pc();
+                    instruction->dyn_pid = TheISA::PointerID(_PID, _TID);
                 }
-                else if (instruction->isFreeCallMicroop() ||
-                         instruction->isReallocSizeCollectorMicroop())
+                else if (instruction->isReallocSizeCollectorMicroop())
+                {
+                    assert(0);
+                }
+                else if (instruction->isReallocBaseCollectorMicroop())
+                {
+                    assert(0);
+                }
+                else if (instruction->isFreeCallMicroop())
                 {
                     instruction->dyn_pid = TheISA::PointerID(0);
                 }
+
 
                 cpu->PointerDepGraph.insert(instruction);
             }

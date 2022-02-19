@@ -1214,7 +1214,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                            it_lv2 = next_it_lv2)
                       {
                         ++next_it_lv2;
-                        if (it_lv2->second.getPID() == bk->pid)
+                        if (it_lv2->second.GetPointerID() == bk->pid)
                         {
                           it_lv1->second.erase(it_lv2);
                         }
@@ -1292,7 +1292,7 @@ AtomicSimpleCPU::collector(ThreadContext * _tc,
                            it_lv2 = next_it_lv2)
                       {
                         ++next_it_lv2;
-                        if (it_lv2->second.getPID() == bk->pid)
+                        if (it_lv2->second.GetPointerID() == bk->pid)
                         {
                           it_lv1->second.erase(it_lv2);
                         }
@@ -1641,7 +1641,7 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
           auto it_lv2 = it_lv1->second.find(curStaticInst->atomic_vaddr);
           if (it_lv2 != it_lv1->second.end()){
              Block bk;
-             bk.pid = it_lv2->second.getPID();
+             bk.pid = it_lv2->second.GetPointerID();
              PIDLogs[pcState.pc()].push_back(bk);
 
              // find the function which loaded a pointer
@@ -1656,7 +1656,7 @@ void AtomicSimpleCPU::getLog(ThreadContext * _tc,
             if (found) {
                 Block* bk = (Block*)foundkey;
                 debug_function_calls[bk->name][pcState.pc()].push_back(
-                                                  it_lv2->second.getPID());
+                                                  it_lv2->second.GetPointerID());
             }
           }
       }

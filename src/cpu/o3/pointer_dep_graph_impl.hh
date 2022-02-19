@@ -558,7 +558,7 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track, 
             DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s] <=== FetchArchRegsPid[%s]=[%d]\n", 
                 TheISA::IntRegIndexStr(dest),
                 TheISA::IntRegIndexStr(src1), 
-                FetchArchRegsPid[src1].getPID());
+                FetchArchRegsPid[src1].GetPointerID());
 
 
             TheISA::PointerID _pid = FetchArchRegsPid[src1];
@@ -606,7 +606,7 @@ PointerDependencyGraph<Impl>::TransferStoreMicroops(DynInstPtr &inst, bool track
                 TheISA::IntRegIndexStr(src1),
                 TheISA::IntRegIndexStr(src0),
                 TheISA::IntRegIndexStr(src2), 
-                FetchArchRegsPid[src2].getPID());
+                FetchArchRegsPid[src2].GetPointerID());
     
     // this is at commit to make sure everything is right! Don't do anything!
     if (sanity)
@@ -662,7 +662,7 @@ PointerDependencyGraph<Impl>::TransferStoreInStackMicroops(DynInstPtr &inst, boo
                 TheISA::IntRegIndexStr(src1),
                 TheISA::IntRegIndexStr(src0),
                 TheISA::IntRegIndexStr(src2), 
-                FetchArchRegsPid[src2].getPID());
+                FetchArchRegsPid[src2].GetPointerID());
     
     // this is at commit to make sure everything is right! Don't do anything!
     if (sanity)
@@ -737,7 +737,7 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track,
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
-                    FetchArchRegsPid[dest].getPID());
+                    FetchArchRegsPid[dest].GetPointerID());
 
         
     }
@@ -772,7 +772,7 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track,
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
-                    FetchArchRegsPid[dest].getPID());
+                    FetchArchRegsPid[dest].GetPointerID());
 
 
     }
@@ -804,7 +804,7 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track,
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
-                    FetchArchRegsPid[dest].getPID());
+                    FetchArchRegsPid[dest].GetPointerID());
 
     }
 
@@ -890,7 +890,7 @@ PointerDependencyGraph<Impl>::TransferLoadInStackMicroops(DynInstPtr &inst, bool
         DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
                     TheISA::IntRegIndexStr(src1),
                     TheISA::IntRegIndexStr(src0), 
-                    FetchArchRegsPid[dest].getPID());
+                    FetchArchRegsPid[dest].GetPointerID());
 
 
     }

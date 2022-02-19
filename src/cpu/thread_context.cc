@@ -222,7 +222,7 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
 
                 auto it = std::find(tc.freedPIDVector.begin(),
                                     tc.freedPIDVector.end(),
-                                    entry2.second.getPID());
+                                    entry2.second.GetPointerID());
                 //cant find this pid in freedPIDVector threfore write it
                 if (it == tc.freedPIDVector.end())
                 {
@@ -231,7 +231,7 @@ serialize(ThreadContext &tc, CheckpointOut &cp)
                   temp1 << std::hex << std::setw(16) <<
                            std::setfill('0') << entry2.first;
                   temp2 << std::hex << std::setw(16) <<
-                           std::setfill('0') << entry2.second.getPID();
+                           std::setfill('0') << entry2.second.GetPointerID();
                   data += temp1.str() + std::string(" ") +
                           temp2.str() + std::string(" ");
                 }

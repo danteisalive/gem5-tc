@@ -700,7 +700,7 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
         else if (inst->dyn_pid != TheISA::PointerID(0))
         {
           bool hit =
-              tc->LRUPidCache.LRUPIDCache_Access(inst->dyn_pid.getPID());
+              tc->LRUPidCache.LRUPIDCache_Access(inst->dyn_pid.GetPointerID());
 
           inst->capFetchCycle = cpu->curCycle();
 
