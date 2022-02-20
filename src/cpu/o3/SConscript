@@ -76,6 +76,7 @@ if 'O3CPU' in env['CPU_MODELS']:
     DebugFlag('TypeTracker')
     DebugFlag('PointerDepGraph')
     DebugFlag('AliasCache')
+    DebugFlag('TypeCheck')
 
     CompoundFlag('O3CPUAll', [ 'Fetch', 'Decode', 'Rename', 'IEW', 'Commit',
         'IQ', 'ROB', 'FreeList', 'LSQ', 'LSQUnit', 'StoreSet', 'MemDepUnit',

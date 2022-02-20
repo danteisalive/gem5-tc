@@ -76,6 +76,7 @@
 #include "sim/full_system.hh"
 #include "sim/system.hh"
 #include "cpu/o3/isa_specific.hh"
+#include "debug/TypeCheck.hh"
 
 using namespace std;
 
@@ -1300,6 +1301,8 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
                           "Invalid type at injection point!\n");
 
                   auto APMetadata = static_cast<TheISA::AllocationPointMeta>(tyche_ap);
+
+                  DPRINTF(TypeCheck, "Injecting Type Check: PC: %s Type:%s\n", thisPC ,pid);
 
                   si->injectMicroops(tc, 
                                    thisPC,

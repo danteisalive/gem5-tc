@@ -937,8 +937,8 @@ class PointerID
     inline static std::ostream &
             operator << (std::ostream & os, const PointerID & _pid)
     {
-        ccprintf(os, "PID(%llu)",
-                _pid.GetPointerID()
+        ccprintf(os, "PID[%llu] TID[%x]",
+                _pid.GetPointerID(), _pid.GetTypeID()
                 );
         return os;
     }
