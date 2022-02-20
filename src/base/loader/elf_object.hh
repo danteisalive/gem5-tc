@@ -51,7 +51,7 @@
 #include "base/loader/object_file.hh"
 #include "debug/TypeMetadata.hh"
 
-#include <boost/algorithm/string.hpp>
+#include <cxxabi.h>
 
 
 
