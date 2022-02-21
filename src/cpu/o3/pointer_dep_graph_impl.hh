@@ -115,6 +115,80 @@ PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
     dump();
 }
 
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst)
+{
+    if (inst->isStore())
+    {
+        return;
+    }
+    else if (inst->isBoundsCheckMicroop())
+    {
+        assert(inst->staticInst->getName() == "ld" && "A non-ld bounds check!\n");
+        assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+        const uint8_t dataSize = inst_regop->dataSize;
+        assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); dest = dest;//dest
+
+        DPRINTF(PointerDepGraph, "Updating PID for Bounds Check Instruction: [%d][%s][%s][%s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid);
+        DPRINTF(PointerDepGraph, "Selected Dependency Graph:\n");
+        dump();
+
+        // if (dependGraph[src1].empty()) {
+        //     DPRINTF(PointerDepGraph, "Dependency Graph is Empty for this Base: %s\n", TheISA::IntRegIndexStr(src1));
+        //     return;
+        // }
+        //if (inst->seqNum > dependGraph[src1].back().inst->seqNum) return inst->dyn_pid;
+        //look at the latest value of PID for base register
+        TheISA::PointerID res = inst->dyn_pid;
+        bool found = false;
+        for (auto it = dependGraph[src1].cbegin(); it != dependGraph[src1].cend(); it++)
+        {
+            if (inst->seqNum > it->inst->seqNum) {
+                res = it->pid;
+                found  = true;
+            } 
+            else {
+                break;
+            }
+        }
+        // if we can't find anything, it means the commit version is valid and is the latest
+        if (!found)
+        {
+            res = CommitArchRegsPid[src1];
+        }
+        inst->dyn_pid = res;
+        inst->staticInst->setStaticPointerID(res);
+
+        DPRINTF(PointerDepGraph, "Updated PID for Bounds Check Instruction: [%d][%s][%s][%s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid);
+
+        return;
+    }
+    else 
+    {
+        assert(false && "getUpdatedPID is called for a non store or bounds check!\n");
+    }
+
+}
+
+
 template <class Impl>
 void
 PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){

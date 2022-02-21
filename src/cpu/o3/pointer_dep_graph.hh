@@ -113,7 +113,7 @@ class PointerDependencyGraph
     void InternalUpdate(DynInstPtr &inst, bool track);
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr &inst);
-
+    void updatePIDWithTypeTracker(DynInstPtr &inst);
     /** Debugging function to dump out the dependency graph.
      */
     void dump(DynInstPtr &inst);
