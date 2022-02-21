@@ -1580,11 +1580,11 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 }
                 else if (instruction->isReallocSizeCollectorMicroop())
                 {
-                    assert(0);
+                    assert(0 && "instruction->isReallocSizeCollectorMicroop()\n");
                 }
                 else if (instruction->isReallocBaseCollectorMicroop())
                 {
-                    assert(0);
+                    assert(0 && "instruction->isReallocBaseCollectorMicroop()");
                 }
                 else if (instruction->isFreeCallMicroop())
                 {

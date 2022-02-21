@@ -154,12 +154,8 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
 
     unsigned lvpt_idx = getIndex(instPC, tid);
 
-    // if the instPC is in the banList then just return zero;
-    // if (banList[lvpt_idx].find(instPC) != banList[lvpt_idx].end()){
-    //     return TheISA::PointerID(0);
-    // }
 
-    //Addr inst_tag = getTag(instPC);
+    Addr inst_tag = getTag(instPC);
 
     assert(lvpt_idx < numEntries);
 
@@ -167,8 +163,7 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
     {
 
       TheISA::PointerID pred_pid = TheISA::PointerID(0);
-      if (1/*inst_tag == lvpt[lvpt_idx].tag
-          && lvpt[lvpt_idx].tid == tid*/)
+      if (inst_tag == lvpt[lvpt_idx].tag && lvpt[lvpt_idx].tid == tid)
       {
           switch (localCtrs[lvpt_idx].read()) {
             case 0x0:
@@ -190,15 +185,7 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
               return TheISA::PointerID(0);
           }
       }
-      // else {
-      //     return TheISA::PointerID(0);
-      // }
-      // if (localPointerPredictor[lvpt_idx].read() > 0 &&
-      //     pred_pid == TheISA::PointerID(0) &&
-      //     confLevel[lvpt_idx].read() > 1)
-      // {
-      //     return TheISA::PointerID(0x1000000000000-1);
-      // }
+
 
       // set the confidence level of this prediction
 

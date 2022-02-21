@@ -148,10 +148,16 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
             // before commiting, perform a sanity check
             PerformSanityCheck(inst);
 
+            assert(dependGraph[dest_reg_idx].back().pid == inst->dyn_pid && 
+                "dependGraph and inst dynamic pid are not consistent!\n");
+
+            // by here we should have the PID and TID both valid!
+            assert(dependGraph[dest_reg_idx].back().pid.GetTypeID() == inst->dyn_pid.GetTypeID() && 
+                "dependGraph and inst dynamic pid are not consistent!\n");
+
             DPRINTF(PointerDepGraph, "Setting: CommitArchRegsPid[%d]=%s\n",
                     TheISA::IntRegIndexStr(dest_reg_idx), dependGraph[dest_reg_idx].back().pid);
-            CommitArchRegsPid[dest_reg_idx] =
-                            dependGraph[dest_reg_idx].back().pid;
+            CommitArchRegsPid[dest_reg_idx] = dependGraph[dest_reg_idx].back().pid;
 
             // zero out all interface regs for the next macroopp
             if (dependGraph[dest_reg_idx].back().inst->isLastMicroop())
@@ -388,6 +394,7 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
                 uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
                 assert(dest < TheISA::NumIntRegs);
                 inst->FetchArchRegsPid[dest] = _pid;
+                it->pid = _pid;
                 found = true;
                 break;
 
@@ -443,8 +450,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
 
     if ((track) && 
         (inst->isMallocBaseCollectorMicroop() ||
-        inst->isCallocBaseCollectorMicroop() ||
-        inst->isReallocBaseCollectorMicroop()))
+        inst->isCallocBaseCollectorMicroop()))
     {
         // here we generate a new PID and insert it into rax
         dependGraph[X86ISA::INTREG_RAX].push_front(
@@ -454,17 +460,25 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
         DPRINTF(PointerDepGraph, "Malloc/Calloc/Realloc base collector is called! Assigned PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RAX]);
     }
-    else if ((track) && 
-            (inst->isFreeCallMicroop() || 
-            inst->isReallocSizeCollectorMicroop()))
+    else if ((track) && inst->isReallocBaseCollectorMicroop())
     {
-
+        assert(0 && "inst->isReallocBaseCollectorMicroop!\n");
+    }
+    else if ((track) &&  inst->isReallocSizeCollectorMicroop())
+    {
+        assert(0 && "inst->isReallocSizeCollectorMicroop()\n");
+    }
+    else if ((track) && inst->isFreeCallMicroop())
+    {
+        assert(inst->dyn_pid == TheISA::PointerID(0) && "Dynamic PID is not zero for FREE CALL!\n");
         dependGraph[X86ISA::INTREG_RDI].push_front(
                                         PointerDepEntry(inst, inst->dyn_pid));
-        //FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
-        inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
-        DPRINTF(PointerDepGraph, "Free/Realloc is called! Invalidating PID=%s\n", 
+        FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
+        //inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
+        // RDI (parameter) and R10 and R11 should be nulled uopn calling free!
+        DPRINTF(PointerDepGraph, "Free is called! Invalidating PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
+
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, track, false);}

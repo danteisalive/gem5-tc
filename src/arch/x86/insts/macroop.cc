@@ -120,6 +120,11 @@ TheISA::PointerID MacroopBase::injectCheckMicroops(
                 {
                     DPRINTF(TypeTracker, "Found a Store/Load that requires injection! BaseRegPid[%s]=%s\n",
                            TheISA::IntRegIndexStr(src1) , _fetchArchRegsPid[src1]);
+                    for (int i = 0; i < TheISA::NumIntRegs; i++)
+                    {
+                        DPRINTF(TypeTracker, "fetchArchRegsPid[%s] = %s\n", TheISA::IntRegIndexStr(i), _fetchArchRegsPid[i]);
+                    }
+                    
                     return _fetchArchRegsPid[src1];
                 }
                 
