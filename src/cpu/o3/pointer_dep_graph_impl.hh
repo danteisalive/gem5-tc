@@ -227,10 +227,11 @@ PointerDependencyGraph<Impl>::doCommit(DynInstPtr &inst){
 
             // by here we should have the PID and TID both valid!
             assert(dependGraph[dest_reg_idx].back().pid.GetTypeID() == inst->dyn_pid.GetTypeID() && 
-                "dependGraph and inst dynamic pid are not consistent!\n");
+                "dependGraph and inst dynamic tid are not consistent!\n");
 
             DPRINTF(PointerDepGraph, "Setting: CommitArchRegsPid[%d]=%s\n",
                     TheISA::IntRegIndexStr(dest_reg_idx), dependGraph[dest_reg_idx].back().pid);
+
             CommitArchRegsPid[dest_reg_idx] = dependGraph[dest_reg_idx].back().pid;
 
             // zero out all interface regs for the next macroopp
@@ -410,12 +411,13 @@ PointerDependencyGraph<Impl>::dump()
         for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); it++)
         {
           assert(it->inst); // shouldnt be a null inst
-          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s] %d\n", 
+          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s][Inst: %s][Dep: %s]\n", 
                                 TheISA::IntRegIndexStr(i),
                                 it->inst->seqNum,
                                 it->inst->pcState(), 
                                 it->inst->staticInst->disassemble(it->inst->pcState().instAddr()),
-                                it->inst->dyn_pid);
+                                it->inst->dyn_pid,
+                                it->pid);
      
         }
     }
@@ -466,7 +468,6 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
                 // insert an entry for the destination reg
                 X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
                 uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
-                assert(dest < TheISA::NumIntRegs);
                 inst->FetchArchRegsPid[dest] = _pid;
                 it->pid = _pid;
                 found = true;
@@ -483,17 +484,34 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
         FetchArchRegsPid[indx] = inst->FetchArchRegsPid[indx];
     }
+
+    std::map<uint64_t, uint64_t> MicroopsToUpdate;
+    // order the microops that are tracked after this pointer refill
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].cbegin(); it != dependGraph[indx].cend(); it++)
+        {
+            if (it->inst->seqNum > inst->seqNum) {
+                MicroopsToUpdate.insert(std::make_pair(it->inst->seqNum, indx));
+            }
+        }
+    }
+
     // now one by one find all the instruction with seqNum greater
-    // than load uop and update their uops
-     for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
-         // Erase  (C++11 and later)
-         for (auto it = dependGraph[indx].rbegin(); it != dependGraph[indx].rend(); it++)
-         {
-             if (it->inst->seqNum > inst->seqNum) {
-               InternalUpdate(it->inst, false);
-             }
-         }
-     }
+    // than load uop and update their uops in order!
+    for (auto& microops : MicroopsToUpdate)
+    {
+        uint64_t SeqNumber = microops.first;
+        uint64_t Indx = microops.second;
+        for (auto it = dependGraph[Indx].begin(); it != dependGraph[Indx].end(); it++)
+        {
+            if (it->inst->seqNum == SeqNumber) {
+                InternalUpdate(it->inst, false);
+                it->pid = it->inst->dyn_pid;
+                break;
+            }
+        }
+    }
 
 
 
@@ -501,7 +519,7 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
     dump();
 
 
-
+   //_ZNSt17_Rb_tree_iteratorISt4pairIKiPvEEC2EPSt18_Rb_tree_node_base+20.0
 }
 
 template <class Impl>
@@ -1125,10 +1143,21 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
                 "Found a 1/2/4 bytes Sub Inst with non-zero PID sources! " 
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
 
-        panic_if((dataSize == 8) && 
+        // this is not acceptable for Sub/SubBig
+        panic_if((dataSize == 8) &&
+                (inst_sub != nullptr || inst_sub_big != nullptr) &&  
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
                 "TransferStoreMicroops :: Found a Sub inst with both regs non-zero PID! "
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+
+        // this is not acceptable for Sub/SubBig
+        panic_if((dataSize == 8) &&
+                (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr) &&  
+                (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)) && 
+                (CommitArchRegsPid[src1] != CommitArchRegsPid[src0]), 
+                "TransferStoreMicroops :: Found a SubFlag* inst with both regs non-zero PID and not equal! "
+                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+
         // dest = src0(PID(0)) - src1(PID(n))
         panic_if((dataSize == 8) && 
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] == TheISA::PointerID(0)), 
@@ -1146,8 +1175,17 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
             TheISA::IntRegIndexStr(src1), 
             FetchArchRegsPid[src1]);
 
-    
-    TheISA::PointerID _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
+     TheISA::PointerID _pid = TheISA::PointerID(0);
+    if (FetchArchRegsPid[src1] != TheISA::PointerID(0) && FetchArchRegsPid[src0] != TheISA::PointerID(0))
+    {
+        // this is for SubFlag/SubFlagBig microops
+        _pid = TheISA::PointerID(0);
+    }
+    else 
+    {
+        // this is for Sub/SubBig microops
+        _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
+    }
 
     FetchArchRegsPid[dest] = _pid;
 

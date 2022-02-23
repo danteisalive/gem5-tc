@@ -75,7 +75,8 @@
         "valarray": "cpp",
         "queue": "cpp",
         "map": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "strstream": "cpp"
     },
     "cmake.configureOnOpen": false
 }

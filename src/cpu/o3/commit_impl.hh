@@ -1337,6 +1337,8 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         head_inst->traceData = NULL;
     }
 
+
+
     if (head_inst->isReturn()) {
         DPRINTF(Commit,"Return Instruction Committed [sn:%lli] PC %s  \
                         --- NextPC: %#lx RAX: %#lx \n",
