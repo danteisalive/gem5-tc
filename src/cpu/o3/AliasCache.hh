@@ -54,9 +54,9 @@
 #include "sim/process.hh"
 #include "debug/AliasCache.hh"
 
-namespace X86ISA
-{
 
+
+template <class Impl>
 class LRUVictimCache
 {
   private:
@@ -132,7 +132,7 @@ class LRUVictimCache
 
 };
 
-
+template <class Impl>
 class LRUAliasCache
 {
     typedef std::pair<uint64_t, uint64_t> AliasTableKey;
@@ -142,9 +142,9 @@ class LRUAliasCache
     void WriteBack(Addr wb_addr);
 
     private:
-        CacheEntry**                 AliasCache;
+        TheISA::CacheEntry**                 AliasCache;
         ExeAliasBuffer               ExeAliasTableBuffer;
-        LRUVictimCache*              VictimCache;
+        LRUVictimCache<Impl>*              VictimCache;
         std::deque<Addr>             WbBuffer;
 
         uint64_t                     NumWays;
@@ -176,19 +176,19 @@ class LRUAliasCache
 
         ~LRUAliasCache();
 
-        bool Access(Addr vaddr, ThreadContext* tc, PointerID* pid ) ;
+        bool Access(Addr vaddr, ThreadContext* tc, TheISA::PointerID* pid ) ;
 
         bool InitiateAccess(Addr vaddr,ThreadContext* tc);
 
-        bool Commit(Addr vaddr, ThreadContext* tc, PointerID& pid);
+        bool Commit(Addr vaddr, ThreadContext* tc, TheISA::PointerID& pid);
         bool CommitStore(Addr vaddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc);
         bool UpdateEntry(Addr vaddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc);
-        bool CommitToShadowMemory(Addr vaddr,ThreadContext* tc, PointerID& pid);
-        bool Invalidate(ThreadContext* tc, PointerID& pid);
+        bool CommitToShadowMemory(Addr vaddr,ThreadContext* tc, TheISA::PointerID& pid);
+        bool Invalidate(ThreadContext* tc, TheISA::PointerID& pid);
 
         bool RemoveStackAliases(Addr vaddr, ThreadContext* tc);
 
-        bool InsertStoreQueue(uint64_t seqNum, Addr effAddr, PointerID& pid);
+        bool InsertStoreQueue(uint64_t seqNum, Addr effAddr, TheISA::PointerID& pid);
 
         bool Squash(uint64_t seqNum, bool include_inst);
 
@@ -206,5 +206,5 @@ class LRUAliasCache
         }
 
 };
-}
+
 #endif // __CPU_O3_ALIAS_CACHE_HH__

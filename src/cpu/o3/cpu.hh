@@ -138,7 +138,7 @@ class FullO3CPU : public BaseO3CPU
     BaseTLB *itb;
     BaseTLB *dtb;
 
-    TheISA::LRUAliasCache* ExeAliasCache;
+    LRUAliasCache<Impl>* ExeAliasCache;
     // 2-entry cache for find_Block_containing
     Block* fbc_cache0 = NULL;
     Block* fbc_cache1 = NULL;
