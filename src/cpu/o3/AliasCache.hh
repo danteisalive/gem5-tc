@@ -59,6 +59,8 @@
 template <class Impl>
 class LRUVictimCache
 {
+  public :
+    typedef typename Impl::DynInstPtr DynInstPtr;
   private:
     std::deque<Addr>            VictimCache;
     int                          NumOfEntrys;
@@ -135,8 +137,10 @@ class LRUVictimCache
 template <class Impl>
 class LRUAliasCache
 {
-    typedef std::pair<uint64_t, uint64_t> AliasTableKey;
-    typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
+    public :
+      typedef typename Impl::DynInstPtr DynInstPtr;
+      typedef std::pair<uint64_t, uint64_t> AliasTableKey;
+      typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
 
     private:
     void WriteBack(Addr wb_addr);
@@ -181,14 +185,14 @@ class LRUAliasCache
         bool InitiateAccess(Addr vaddr,ThreadContext* tc);
 
         bool Commit(Addr vaddr, ThreadContext* tc, TheISA::PointerID& pid);
-        bool CommitStore(Addr vaddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc);
-        bool UpdateEntry(Addr vaddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc);
+        bool CommitStore(DynInstPtr& head_inst, ThreadContext* tc);
+        bool UpdateEntry(DynInstPtr& head_inst, ThreadContext* tc);
         bool CommitToShadowMemory(Addr vaddr,ThreadContext* tc, TheISA::PointerID& pid);
         bool Invalidate(ThreadContext* tc, TheISA::PointerID& pid);
 
         bool RemoveStackAliases(Addr vaddr, ThreadContext* tc);
 
-        bool InsertStoreQueue(uint64_t seqNum, Addr effAddr, TheISA::PointerID& pid);
+        bool InsertStoreQueue(DynInstPtr& head_inst);
 
         bool Squash(uint64_t seqNum, bool include_inst);
 

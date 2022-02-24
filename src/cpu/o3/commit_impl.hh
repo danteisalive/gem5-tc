@@ -1741,9 +1741,9 @@ DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &he
   // first call updatePIDWithTypeTracker to make sure we have the latest PID from type tracker
   cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst);
   // update all the entrys in the AliasCache to make sure we are in sync
-  //cpu->ExeAliasCache->UpdateEntry(head_inst->effAddr, head_inst->seqNum, head_inst->dyn_pid, tc);
+  //cpu->ExeAliasCache->UpdateEntry(head_inst, tc);
   // then update the ExecStore in alias cache before updating it
-  cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, head_inst->dyn_pid, tc);
+  cpu->ExeAliasCache->CommitStore(head_inst, tc);
 
   Process *p = tc->getProcessPtr();
   Addr vpn = p->pTable->pageAlign(head_inst->effAddr);

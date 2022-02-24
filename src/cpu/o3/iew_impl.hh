@@ -2031,62 +2031,10 @@ DefaultIEW<Impl>::IEWUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPt
                     inst->readIntRegOperand(inst->staticInst.get(),2); // src(2) is the data register
 
   DPRINTF(TypeTracker, "IEWUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", inst->seqNum, inst->effAddr, inst->dyn_pid, dataRegContent);
-  cpu->ExeAliasCache->InsertStoreQueue(inst->seqNum, inst->effAddr, inst->dyn_pid);
+  cpu->ExeAliasCache->InsertStoreQueue(inst);
 
 }
 
-template <class Impl>
-void
-DefaultIEW<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &inst)
-{
-   assert(0);
-   assert(inst->isStore());
-
-  //ThreadContext * tc = cpu->tcBase(tid);
-  const StaticInstPtr si = inst->staticInst;
-
-
-  if (inst->isMicroopInjected()) return;
-  if (inst->isBoundsCheckMicroop()) return;
-  if (!trackAlias(inst)) return;   // dont care about AP functions
-
-  // datasize should be 4/8 bytes othersiwe it's not a base address
-  if (si->getDataSize() != 8) return; // only for 64 bits system
-       // return if store is not pointed to the DS or SS section
-  if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
-      si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
-       //  to our knowledge:
-       // (base < 16) and base == 32 could be used for addresing.
-       // igonre stores which don't use these regs
-  RegIndex baseRegInx = si->getBase();
-  if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
-        (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
-
-  if (!inst->srcRegIdx(2).isIntReg()) return; // this is the dest reg
-  RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
-
-  if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
-
-  // srcReg[2] in store microops is the register that
-  //we want to write its value to mem
-  uint64_t  dataRegContent =
-                    inst->readIntRegOperand(inst->staticInst.get(),2);
-
-  // check if this is a base address or not
-  TheISA::PointerID _pid = inst->FetchArchRegsPid[inst->srcRegIdx(2).index()];//TheISA::PointerID(0);
-  Block* bk = cpu->find_Block_containing(dataRegContent,tid);
-  if (bk && (bk->payload <= dataRegContent && ((bk->payload + bk->req_szB) > dataRegContent))) { // just the base addresses
-    assert(bk->pid != 0);
-    _pid = TheISA::PointerID(bk->pid);
-
-  }
-
-  // finally if it's a base adress write it in the execute alias table
-  //put it into exe alias table and later in commit delete it
-    DPRINTF(IEW, "Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", inst->seqNum, inst->effAddr, _pid, dataRegContent);
-    cpu->ExeAliasCache->InsertStoreQueue(inst->seqNum, inst->effAddr, _pid);
-
-}
 
 template <class Impl>
 bool

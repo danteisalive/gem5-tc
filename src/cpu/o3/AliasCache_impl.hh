@@ -288,12 +288,12 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     }
 
     template <class Impl>
-    bool LRUAliasCache<Impl>::CommitStore(Addr vaddr,
-                                    uint64_t storeSeqNum, 
-                                    TheISA::PointerID finalPid,
-                                    ThreadContext* tc){
+    bool LRUAliasCache<Impl>::CommitStore(DynInstPtr& head_inst, ThreadContext* tc){
       // here commit the youngest entry of the ExeAliasBuffer to shadow memory
       // which is actually the CommitAliasTable
+      Addr vaddr = head_inst->effAddr;
+      uint64_t storeSeqNum = head_inst->seqNum;
+      TheISA::PointerID finalPid = head_inst->dyn_pid;
       for (auto it = ExeAliasTableBuffer.cbegin(), next_it = it;
                     it != ExeAliasTableBuffer.cend();
                     it = next_it)
@@ -598,12 +598,14 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     }
 
     template <class Impl>
-    bool LRUAliasCache<Impl>::InsertStoreQueue(uint64_t seqNum, Addr effAddr,
-                                         TheISA::PointerID& pid)
+    bool LRUAliasCache<Impl>::InsertStoreQueue(DynInstPtr& inst)
     {
+
+      uint64_t seqNum =  inst->seqNum;
+      Addr effAddr = inst->effAddr;
+      TheISA::PointerID pid = inst->dyn_pid;
       DPRINTF(AliasCache, "Alias Cache InsertStoreQueue:: SeqNum: %d EffAddr: 0x%x\n", seqNum, effAddr);
-      
-      ExeAliasTableBuffer[AliasTableKey(seqNum,effAddr)] = pid;
+      ExeAliasTableBuffer[AliasTableKey(seqNum, effAddr)] = pid;
 
       DumpAliasTableBuffer();
 
@@ -777,8 +779,12 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
         }
     }
     template <class Impl>
-    bool LRUAliasCache<Impl>::UpdateEntry(Addr effAddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc)
+    bool LRUAliasCache<Impl>::UpdateEntry(DynInstPtr& inst, ThreadContext* tc)
     {
+
+        Addr effAddr = inst->effAddr;
+        uint64_t storeSeqNum = inst->seqNum;
+
         DPRINTF(AliasCache, "UpdateEntry: Updating Alias Cache InsertStoreQueue Entry SeqNum: %d EffAddr: 0x%x\n", 
                 storeSeqNum, effAddr);
         
