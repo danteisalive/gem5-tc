@@ -288,19 +288,20 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     }
 
     template <class Impl>
-    bool LRUAliasCache<Impl>::CommitStore(DynInstPtr& head_inst, ThreadContext* tc){
+    bool LRUAliasCache<Impl>::CommitStore(DynInstPtr& head_inst, ThreadContext* tc)
+    {
       // here commit the youngest entry of the ExeAliasBuffer to shadow memory
       // which is actually the CommitAliasTable
       Addr vaddr = head_inst->effAddr;
       uint64_t storeSeqNum = head_inst->seqNum;
-      TheISA::PointerID finalPid = head_inst->dyn_pid;
-      for (auto it = ExeAliasTableBuffer.cbegin(), next_it = it;
-                    it != ExeAliasTableBuffer.cend();
-                    it = next_it)
-      {
-            ++next_it;
-            if (it->first.first == storeSeqNum &&
-                it->first.second == vaddr)
+      TheISA::PointerID writeback_pid = head_inst->dyn_pid;
+
+
+      auto it = ExeAliasTableBuffer.begin();
+      while(it != ExeAliasTableBuffer.end()) {
+
+            if (it->first->seqNum == storeSeqNum &&
+                it->first->effAddr == vaddr)
             {
 
                 // this is not a stack alias therfore commit it to
@@ -308,8 +309,6 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                 //writeback to alias cache
                 // if this page has no alias and wb_pid is zero
                 // do not send it for commit just remove it
-                //TheISA::PointerID writeback_pid = it->second;
-                TheISA::PointerID writeback_pid = finalPid;
                 Process *p = tc->getProcessPtr();
                 Addr vaddr_vpn = p->pTable->pageAlign(vaddr);
                 auto sm_it = tc->ShadowMemory.find(vaddr_vpn);
@@ -318,21 +317,27 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                 if (writeback_pid != TheISA::PointerID(0) ||
                     sm_it != tc->ShadowMemory.end())
                 {
-                  commited = Commit(it->first.second, tc, writeback_pid);
+                  commited = Commit(it->first->effAddr, tc, writeback_pid);
                 }
                 //delete from alias store buffer
-                ExeAliasTableBuffer.erase(it);
+                it = ExeAliasTableBuffer.erase(it);
                 DPRINTF(AliasCache, "LRUAliasCache::CommitStore:: %s Alias with VAddr=0x%x PID=%s to Shadow Memory!\n",
-                        commited ? "COMMITED":"DID NOT COMMIT" ,it->first.second, writeback_pid);
+                        commited ? "COMMITED":"DID NOT COMMIT" ,it->first->effAddr, writeback_pid);
                 DumpShadowMemory(tc);
                 return true;
             }
-            else {
-              panic("LRUAliasCache::CommitStore::Commiting a store which cannot be found!\n");
+            else 
+            {
+              ++it;
             }
       }
+
+      // never should reach here!
+      panic("LRUAliasCache::CommitStore::Commiting a store which cannot be found!\n");
       return false;
+      
     }
+
     template <class Impl>
     bool LRUAliasCache<Impl>::Commit(Addr vaddr,ThreadContext* tc, TheISA::PointerID& pid)
     {
@@ -526,16 +531,18 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
         // this removal shoidl happen when returnin from Free function
         // but as we dont know the pid at the return and we are not tracking
         // anything during the free fucntion we can safelydo it here!
-        for (auto it = ExeAliasTableBuffer.cbegin(), next_it = it;
-                 it != ExeAliasTableBuffer.cend(); it = next_it)
-        {
-              ++next_it;
-              if (it->second.GetPointerID() == pid.GetPointerID())
-              {
-                ExeAliasTableBuffer.erase(it);
-              }
-        }
+        auto it = ExeAliasTableBuffer.begin();
+        while(it != ExeAliasTableBuffer.end()) {
 
+            if (it->second.GetPointerID() == pid.GetPointerID()) 
+            {
+              it = ExeAliasTableBuffer.erase(it);
+            }
+            else 
+            {
+              ++it;
+            }
+        }
         return true;
 
 
@@ -604,8 +611,8 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
       uint64_t seqNum =  inst->seqNum;
       Addr effAddr = inst->effAddr;
       TheISA::PointerID pid = inst->dyn_pid;
-      DPRINTF(AliasCache, "Alias Cache InsertStoreQueue:: SeqNum: %d EffAddr: 0x%x\n", seqNum, effAddr);
-      ExeAliasTableBuffer[AliasTableKey(seqNum, effAddr)] = pid;
+      DPRINTF(AliasCache, "Alias Cache InsertStoreQueue:: Inst: %x SeqNum: %d EffAddr: 0x%x\n", inst.get() , seqNum, effAddr);
+      ExeAliasTableBuffer.push_back(std::make_pair(inst, pid));
 
       DumpAliasTableBuffer();
 
@@ -614,35 +621,35 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     }
     template <class Impl>
     bool LRUAliasCache<Impl>::Squash(uint64_t squashed_num, bool include_inst){
-      // new code
-      for (auto exe_alias_buffer =
-           ExeAliasTableBuffer.cbegin(), next_it = exe_alias_buffer;
-           exe_alias_buffer != ExeAliasTableBuffer.cend();
-           exe_alias_buffer = next_it)
-      {
-         ++next_it;
-         if (include_inst &&
-            (exe_alias_buffer->first.first >= squashed_num))
-         {
-           DPRINTF(AliasCache, "Alias Cache Squash (Include Inst):: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
-                  exe_alias_buffer->first.first, 
-                  exe_alias_buffer->first.second,
-                  exe_alias_buffer->second
-                  );
+
+      auto  exe_alias_buffer = ExeAliasTableBuffer.begin();
+      while(exe_alias_buffer != ExeAliasTableBuffer.end()) {
+
+          if (include_inst &&
+              (exe_alias_buffer->first->seqNum >= squashed_num))
+          {
+            DPRINTF(AliasCache, "Alias Cache Squash (Include Inst):: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                    exe_alias_buffer->first->seqNum, 
+                    exe_alias_buffer->first->effAddr,
+                    exe_alias_buffer->second
+                    );
+            
+            exe_alias_buffer = ExeAliasTableBuffer.erase(exe_alias_buffer);
+          }
+          else if (!include_inst &&
+                  (exe_alias_buffer->first->seqNum > squashed_num))
+          {
+            DPRINTF(AliasCache, "Alias Cache Squash !(Include Inst):: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                    exe_alias_buffer->first->seqNum, 
+                    exe_alias_buffer->first->effAddr,
+                    exe_alias_buffer->second
+                    );
+            exe_alias_buffer = ExeAliasTableBuffer.erase(exe_alias_buffer);
+          }
           
-           ExeAliasTableBuffer.erase(exe_alias_buffer);
-         }
-         else if (!include_inst &&
-                 (exe_alias_buffer->first.first > squashed_num))
-         {
-           DPRINTF(AliasCache, "Alias Cache Squash !(Include Inst):: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
-                  exe_alias_buffer->first.first, 
-                  exe_alias_buffer->first.second,
-                  exe_alias_buffer->second
-                  );
-           ExeAliasTableBuffer.erase(exe_alias_buffer);
-         }
+          else ++exe_alias_buffer;
       }
+
 
       DumpAliasTableBuffer();
 
@@ -659,10 +666,10 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                   exe_alias_buffer != ExeAliasTableBuffer.rend();
                       ++exe_alias_buffer)
       {
-          if (exe_alias_buffer->first.second == effAddr){
+          if (exe_alias_buffer->first->effAddr == effAddr){
             DPRINTF(AliasCache, " AccessStoreQueue::Found an alias in Alias Cache Store Queue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
-                  exe_alias_buffer->first.first, 
-                  exe_alias_buffer->first.second,
+                  exe_alias_buffer->first->seqNum, 
+                  exe_alias_buffer->first->effAddr,
                   exe_alias_buffer->second
                   );
         
@@ -676,31 +683,35 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                 effAddr);
        return false; // not in SQ
     }
-    template <class Impl>
-    bool LRUAliasCache<Impl>::SquashEntry(uint64_t squashed_num){
 
-      for (auto exe_alias_table =
-           ExeAliasTableBuffer.cbegin(), next_it = exe_alias_table;
-          exe_alias_table != ExeAliasTableBuffer.cend();
-          exe_alias_table = next_it)
-      {
-         ++next_it;
-         if (exe_alias_table->first.first == squashed_num)
-         {
-            DPRINTF(AliasCache, "Alias Cache SquashEntry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
-                  exe_alias_table->first.first, 
-                  exe_alias_table->first.second,
-                  exe_alias_table->second
-                  );
-           
-            //remove and break we cant have two equal seqNum
-            ExeAliasTableBuffer.erase(exe_alias_table);
-            return true;
-         }
-      }
+
+    template <class Impl>
+    bool LRUAliasCache<Impl>::SquashEntry(uint64_t squashed_num)
+    {
+
+        auto exe_alias_table = ExeAliasTableBuffer.begin();
+
+        while(exe_alias_table != ExeAliasTableBuffer.end()) {
+
+            if(exe_alias_table->first->seqNum == squashed_num) {
+
+                DPRINTF(AliasCache, "Alias Cache SquashEntry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                      exe_alias_table->first->seqNum, 
+                      exe_alias_table->first->effAddr,
+                      exe_alias_table->second
+                      );
+                exe_alias_table = ExeAliasTableBuffer.erase(exe_alias_table);
+                return true;
+            }
+            else 
+            {
+              ++exe_alias_table;
+            }
+        }
 
       return false;
     }
+
     template <class Impl>
     void LRUAliasCache<Impl>::print_stats() {
         printf("Alias Cache Stats: %lu, %lu, %lu, %f \n",
@@ -713,8 +724,8 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
       //dump for debugging
       for (auto& entry : ExeAliasTableBuffer) {
         DPRINTF(AliasCache, "Alias Cache:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
-                  entry.first.first, 
-                  entry.first.second,
+                  entry.first->seqNum, 
+                  entry.first->effAddr,
                   entry.second
                   );
       }
@@ -792,14 +803,14 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                   exe_alias_table != ExeAliasTableBuffer.end();
                   exe_alias_table++)
         {
-          if (exe_alias_table->first.first == storeSeqNum)
+          if (exe_alias_table->first->seqNum == storeSeqNum)
           {
               DPRINTF(AliasCache, "Alias Cache Update Entry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
-                    exe_alias_table->first.first, 
-                    exe_alias_table->first.second,
+                    exe_alias_table->first->seqNum, 
+                    exe_alias_table->first->effAddr,
                     exe_alias_table->second
                     );
-              assert(exe_alias_table->first.second == effAddr && 
+              assert(exe_alias_table->first->effAddr == effAddr && 
                     "Store Seq Number and Effective Address do not match!\n");
               DumpAliasTableBuffer();
               return true;

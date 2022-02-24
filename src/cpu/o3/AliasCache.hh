@@ -139,8 +139,8 @@ class LRUAliasCache
 {
     public :
       typedef typename Impl::DynInstPtr DynInstPtr;
-      typedef std::pair<uint64_t, uint64_t> AliasTableKey;
-      typedef std::map<AliasTableKey, TheISA::PointerID> ExeAliasBuffer;
+      typedef std::pair<DynInstPtr, TheISA::PointerID> AliasTableKey;
+      typedef std::vector<AliasTableKey> ExeAliasBuffer;
 
     private:
     void WriteBack(Addr wb_addr);
