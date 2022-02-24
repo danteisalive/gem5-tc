@@ -123,6 +123,41 @@ PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst)
 {
     if (inst->isStore())
     {
+        assert((inst->staticInst->getName() == "st" || inst->staticInst->getName() == "stis") && 
+                "updatePIDWithTypeTracker is called fro a store that is not st/stis\n");
+        assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+        const uint8_t dataSize = inst_regop->dataSize;
+        assert(dataSize == 8 && "dataSize is not equal to 8!\n");
+
+        X86ISAInst::St * inst_st = dynamic_cast<X86ISAInst::St*>(inst->staticInst.get()); 
+        X86ISAInst::Stis * inst_stis = dynamic_cast<X86ISAInst::Stis*>(inst->staticInst.get()); 
+        assert((inst_st != nullptr || inst_stis != nullptr) && "Found a st inst that is not X86ISA::St or X86ISA::Stis!\n");
+    
+
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;//base
+        uint16_t src2 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //data
+        
+        DPRINTF(PointerDepGraph, "Store Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID());
+
+        inst->dyn_pid = CommitArchRegsPid[src2];
+        inst->staticInst->setStaticPointerID(CommitArchRegsPid[src2]);
+
+        DPRINTF(PointerDepGraph, "Updated PID for Store Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID());
         return;
     }
     else if (inst->isBoundsCheckMicroop())

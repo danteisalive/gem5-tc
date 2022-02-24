@@ -1318,8 +1318,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         CommitUpdateAliasTableInCommit(tid, head_inst);
       }
 
-      cpu->ExeAliasCache->RemoveStackAliases(
-                      cpu->readArchIntReg(X86ISA::INTREG_RSP,tid),tc);
+      cpu->ExeAliasCache->RemoveStackAliases(cpu->readArchIntReg(X86ISA::INTREG_RSP,tid), tc);
 
     }
 
@@ -1739,53 +1738,12 @@ DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &he
                     head_inst->readIntRegOperand(head_inst->staticInst.get(),2); // src(2) is the data register
 
   DPRINTF(TypeTracker, "CommitUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", head_inst->seqNum, head_inst->effAddr, head_inst->dyn_pid, dataRegContent);
-  cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
-
-  Process *p = tc->getProcessPtr();
-  Addr vpn = p->pTable->pageAlign(head_inst->effAddr);
-  if (!cpu->dtb->lookupAndUpdateEntry(vpn, true)){
-    warn("No Entry found for commited store!\n");
-  }
-
-
-}
-
-// In this fucntion if
-template <class Impl>
-void
-DefaultCommit<Impl>::updateAliasTable(ThreadID tid, DynInstPtr &head_inst)
-{
-  
-  assert(0);
-  #define ENABLE_COMMIT_ALIAS_TABLE_DEBUG 0
-
-  ThreadContext * tc = cpu->tcBase(tid);
-  const StaticInstPtr si = head_inst->staticInst;
-
-  // exact replica of updateAliasTable in IEW
-  if (head_inst->isMicroopInjected()) return;
-  if (head_inst->isBoundsCheckMicroop()) return;
-  if (!cpu->fetch.TrackAlias(tc, (Addr)head_inst->pcState().pc())) return;   // dont care about AP functions
-
-  // datasize should be 4/8 bytes othersiwe it's not a base address
-  if (si->getDataSize() != 8) return; // only for 64 bits system
-       // return if store is not pointed to the DS or SS section
-  if (!(si->getSegment() == TheISA::SEGMENT_REG_DS ||
-      si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
-       //  to our knowledge:
-       // (base < 16) and base == 32 could be used for addresing.
-       // igonre stores which don't use these regs
-  RegIndex baseRegInx = si->getBase();
-  if (!((baseRegInx < X86ISA::NUM_INTREGS) ||   // < 16
-        (baseRegInx == X86ISA::NUM_INTREGS + 7))) return;  //  == t7
-
-  if (!head_inst->srcRegIdx(2).isIntReg()) return; // this is the dest reg
-  RegIndex  dataRegIdx = si->getMemOpDataRegIndex();
-
-  if (dataRegIdx > (X86ISA::NUM_INTREGS + 15)) return;
-
-
-  cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, tc);
+  // first call updatePIDWithTypeTracker to make sure we have the latest PID from type tracker
+  cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst);
+  // update all the entrys in the AliasCache to make sure we are in sync
+  //cpu->ExeAliasCache->UpdateEntry(head_inst->effAddr, head_inst->seqNum, head_inst->dyn_pid, tc);
+  // then update the ExecStore in alias cache before updating it
+  cpu->ExeAliasCache->CommitStore(head_inst->effAddr, head_inst->seqNum, head_inst->dyn_pid, tc);
 
   Process *p = tc->getProcessPtr();
   Addr vpn = p->pTable->pageAlign(head_inst->effAddr);

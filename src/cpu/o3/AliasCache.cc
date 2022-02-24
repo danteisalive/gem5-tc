@@ -87,7 +87,7 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         // sqn of the entry in the case of a squash
     bool LRUAliasCache::Access(Addr vaddr, ThreadContext* tc,PointerID* pid )
     {
-
+            DPRINTF(AliasCache, " Access:: Access for EffAddr: 0x%x\n", vaddr);
             // first look into the SQ
             bool SQHit = AccessStoreQueue(vaddr,pid);
             if (SQHit){
@@ -234,6 +234,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
         //TODO: stats
         total_accesses = total_accesses + 1;
 
+        DPRINTF(AliasCache, " InitiateAccess::Initiating Access for EffAddr: 0x%x\n", vaddr);
+
         // first look into the SQ
         PointerID* pid = new PointerID(0);
         bool SQHit = AccessStoreQueue(vaddr, pid);
@@ -285,7 +287,9 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
 
 
     bool LRUAliasCache::CommitStore(Addr vaddr,
-                                    uint64_t storeSeqNum, ThreadContext* tc){
+                                    uint64_t storeSeqNum, 
+                                    TheISA::PointerID finalPid,
+                                    ThreadContext* tc){
       // here commit the youngest entry of the ExeAliasBuffer to shadow memory
       // which is actually the CommitAliasTable
       for (auto it = ExeAliasTableBuffer.cbegin(), next_it = it;
@@ -302,7 +306,8 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
                 //writeback to alias cache
                 // if this page has no alias and wb_pid is zero
                 // do not send it for commit just remove it
-                TheISA::PointerID writeback_pid = it->second;
+                //TheISA::PointerID writeback_pid = it->second;
+                TheISA::PointerID writeback_pid = finalPid;
                 Process *p = tc->getProcessPtr();
                 Addr vaddr_vpn = p->pTable->pageAlign(vaddr);
                 auto sm_it = tc->ShadowMemory.find(vaddr_vpn);
@@ -768,6 +773,33 @@ LRUAliasCache::LRUAliasCache(uint64_t _num_ways,
             outstandingWrite++;
           }
         }
+    }
+
+    bool LRUAliasCache::UpdateEntry(Addr effAddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc)
+    {
+        DPRINTF(AliasCache, "UpdateEntry: Updating Alias Cache InsertStoreQueue Entry SeqNum: %d EffAddr: 0x%x\n", 
+                storeSeqNum, effAddr);
+        
+        for (auto exe_alias_table = ExeAliasTableBuffer.begin();
+                  exe_alias_table != ExeAliasTableBuffer.end();
+                  exe_alias_table++)
+        {
+          if (exe_alias_table->first.first == storeSeqNum)
+          {
+              DPRINTF(AliasCache, "Alias Cache Update Entry:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                    exe_alias_table->first.first, 
+                    exe_alias_table->first.second,
+                    exe_alias_table->second
+                    );
+              assert(exe_alias_table->first.second == effAddr && 
+                    "Store Seq Number and Effective Address do not match!\n");
+              DumpAliasTableBuffer();
+              return true;
+          }
+        }
+
+        return false;
+
     }
 
 

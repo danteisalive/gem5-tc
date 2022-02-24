@@ -181,7 +181,8 @@ class LRUAliasCache
         bool InitiateAccess(Addr vaddr,ThreadContext* tc);
 
         bool Commit(Addr vaddr, ThreadContext* tc, PointerID& pid);
-        bool CommitStore(Addr vaddr,uint64_t storeSeqNum, ThreadContext* tc);
+        bool CommitStore(Addr vaddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc);
+        bool UpdateEntry(Addr vaddr,uint64_t storeSeqNum, TheISA::PointerID finalPID, ThreadContext* tc);
         bool CommitToShadowMemory(Addr vaddr,ThreadContext* tc, PointerID& pid);
         bool Invalidate(ThreadContext* tc, PointerID& pid);
 
