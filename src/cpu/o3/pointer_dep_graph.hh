@@ -111,6 +111,8 @@ class PointerDependencyGraph
 
     void doUpdate(DynInstPtr& inst);
     void InternalUpdate(DynInstPtr &inst, bool track);
+    void syncPointerRefills(DynInstPtr &inst);
+    void updatePointerRefillLoad(DynInstPtr &inst, TheISA::PointerID pid);
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr &inst);
     void updatePIDWithTypeTracker(DynInstPtr &inst);

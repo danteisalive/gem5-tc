@@ -1539,9 +1539,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 if (inst->macroop->PredictionPointerRefillConfidence < 12)
                   cpu->LVPTMissPredictP0ANPointerLowConfidence++;
 
-                inst->macroop->setMacroopPid(pid);
-                inst->staticInst->setStaticPointerID(pid);
-                inst->dyn_pid = pid;
+
+                cpu->PointerDepGraph.updatePointerRefillLoad(inst, pid);
                 return true;
 
             }
@@ -1569,9 +1568,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 if (inst->macroop->PredictionPointerRefillConfidence < 12)
                     cpu->LVPTMissPredictPMANPointerLowConfidence++;
 
-                inst->macroop->setMacroopPid(pid);
-                inst->staticInst->setStaticPointerID(pid);
-                inst->dyn_pid = pid;
+                cpu->PointerDepGraph.updatePointerRefillLoad(inst, pid);
                 return true;
             }
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
@@ -1598,9 +1595,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
                 if (inst->macroop->PredictionPointerRefillConfidence < 12)
                     cpu->LVPTMissPredictPNA0PointerLowConfidence++;
 
-                inst->macroop->setMacroopPid(pid);
-                inst->staticInst->setStaticPointerID(pid);
-                inst->dyn_pid = pid;
+                cpu->PointerDepGraph.updatePointerRefillLoad(inst, pid);
                 return true;
             }
 

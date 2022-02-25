@@ -115,6 +115,111 @@ PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
     dump();
 }
 
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updatePointerRefillLoad(DynInstPtr &inst, TheISA::PointerID pid)
+{
+    inst->macroop->setMacroopPid(pid);
+    inst->staticInst->setStaticPointerID(pid);
+    inst->dyn_pid = pid;
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    assert(inst_regop != nullptr && "inst_regop is null!\n");
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 && "Invalid load refill size!\n");
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;//base
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+
+    for (auto it = dependGraph[dest].begin(); it != dependGraph[dest].end(); it++)
+    {
+        if (it->inst->seqNum == inst->seqNum) 
+        {
+            assert(it->inst->isLoad() && 
+                    "updatePointerRefillLoad:: doUpdate is callled for non-load microop!\n");
+            it->pid = inst->dyn_pid;
+            
+            DPRINTF(PointerDepGraph, "updatePointerRefillLoad:: Updated Pointer Refill: [%d][%s][%s][Dyn: %s][Static: %s][Dep.: %s]\n", 
+                        it->inst->seqNum,
+                        it->inst->pcState(), 
+                        it->inst->staticInst->disassemble(it->inst->pcState().instAddr()),
+                        it->inst->dyn_pid,
+                        it->inst->staticInst->getStaticPointerID(),
+                        it->pid
+                        );
+
+
+
+
+            return;
+        }
+
+    } // for loop
+
+    assert("Cannot find a load refill that should be in the dependency graph!\n");
+
+}
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::syncPointerRefills(DynInstPtr &inst)
+{
+        assert(inst->isStore() && "syncPointerRefills for non-store microop!\n");
+
+        for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) 
+        {
+            // Erase  (C++11 and later)
+            for (auto it = dependGraph[indx].begin(); it != dependGraph[indx].end(); it++)
+            {
+                //if found: update and return
+                if (it->inst->isAliasInTransition() && 
+                    (it->inst->getAliasStoreSeqNum() == inst->seqNum) &&
+                    (it->inst->dyn_pid != inst->dyn_pid)) 
+                {
+
+                    DPRINTF(PointerDepGraph, "Load Refill Instruction is not in Sync: [%d][%s][%s][Dyn: %s][Static: %s][Dep.: %s][Macro: %s]\n", 
+                        it->inst->seqNum,
+                        it->inst->pcState(), 
+                        it->inst->staticInst->disassemble(it->inst->pcState().instAddr()),
+                        it->inst->dyn_pid,
+                        it->inst->staticInst->getStaticPointerID(),
+                        it->pid,
+                        it->inst->macroop->getMacroopPid()
+                        );
+
+                    it->pid = inst->dyn_pid;
+                    it->inst->dyn_pid = inst->dyn_pid;
+                    it->inst->staticInst->setStaticPointerID(inst->dyn_pid);
+                    it->inst->macroop->setMacroopPid(inst->dyn_pid);
+                    assert(it->inst->isLoad() && "syncPointerRefills:: doUpdate is callled for non-load microop!\n");
+
+                    DPRINTF(PointerDepGraph, "Load Refill Instruction After Sync: [%d][%s][%s][Dyn: %s][Static: %s][Dep.: %s][Macro: %s]\n", 
+                        it->inst->seqNum,
+                        it->inst->pcState(), 
+                        it->inst->staticInst->disassemble(it->inst->pcState().instAddr()),
+                        it->inst->dyn_pid,
+                        it->inst->staticInst->getStaticPointerID(),
+                        it->pid,
+                        it->inst->macroop->getMacroopPid()
+                        );
+
+                    doUpdate(it->inst);
+                }
+                else if (it->inst->isAliasInTransition() && 
+                        (it->inst->getAliasStoreSeqNum() == inst->seqNum) &&
+                        (it->inst->dyn_pid == inst->dyn_pid)) 
+                {
+                    dump();
+                    assert((it->pid == inst->dyn_pid) && "DependGraph and Inst. are not in Sync!\n");
+                }
+            }
+
+        } // for loop
+}
 
 
 template <class Impl>
@@ -158,10 +263,15 @@ PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst)
                 inst->staticInst->disassemble(inst->pcState().instAddr()),
                 inst->dyn_pid,
                 inst->staticInst->getStaticPointerID());
+
+        // now go through all the pointer refills that use this pointer spill and make sure they are in sync!
+        syncPointerRefills(inst);
+
         return;
     }
     else if (inst->isBoundsCheckMicroop())
     {
+        assert(inst->isLoad() && "A non-load bounds chec k microop!\n");
         assert(inst->staticInst->getName() == "ld" && "A non-ld bounds check!\n");
         assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
         TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
@@ -446,13 +556,16 @@ PointerDependencyGraph<Impl>::dump()
         for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); it++)
         {
           assert(it->inst); // shouldnt be a null inst
-          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s][Inst: %s][Dep: %s]\n", 
+          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s][Inst: %s][Dep: %s][AIT: %s][%d]\n", 
                                 TheISA::IntRegIndexStr(i),
                                 it->inst->seqNum,
                                 it->inst->pcState(), 
                                 it->inst->staticInst->disassemble(it->inst->pcState().instAddr()),
                                 it->inst->dyn_pid,
-                                it->pid);
+                                it->pid, 
+                                (it->inst->isAliasInTransition() ? "Yes" : "No"),
+                                (it->inst->isAliasInTransition() ? it->inst->getAliasStoreSeqNum() : 0)
+                                );
      
         }
     }
@@ -479,11 +592,11 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
             "Not a ld or ldis instruction called with doUpdate()\n");
     assert(inst->staticInst->getDataSize() == 8 && "data size is not 8!");
 
-    DPRINTF(PointerDepGraph, "IEW Updating Alias for Instruction: [%d][%s][%s]\n", 
+    DPRINTF(PointerDepGraph, "Updating Alias for Instruction: [%d][%s][%s]\n", 
             inst->seqNum,
             inst->pcState(), 
             inst->staticInst->disassemble(inst->pcState().instAddr()));
-    DPRINTF(PointerDepGraph, "Dependency Graph Before IEW Updating:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph Before Updating:\n");
     dump();
 
 
@@ -520,6 +633,12 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
         FetchArchRegsPid[indx] = inst->FetchArchRegsPid[indx];
     }
 
+    DPRINTF(PointerDepGraph, "FetchArchRegsPids Reg Before Update:\n");
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        DPRINTF(PointerDepGraph, "FetchArchRegsPids[%s]  = %s\n", 
+                TheISA::IntRegIndexStr(indx) , FetchArchRegsPid[indx]);
+    }
+
     std::map<uint64_t, uint64_t> MicroopsToUpdate;
     // order the microops that are tracked after this pointer refill
     for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
@@ -550,11 +669,10 @@ PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)
 
 
 
-    DPRINTF(PointerDepGraph, "Dependency Graph After IEW Updating:\n");
+    DPRINTF(PointerDepGraph, "Dependency Graph After Updating:\n");
     dump();
 
 
-   //_ZNSt17_Rb_tree_iteratorISt4pairIKiPvEEC2EPSt18_Rb_tree_node_base+20.0
 }
 
 template <class Impl>
