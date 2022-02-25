@@ -52,6 +52,7 @@
 #include "debug/Capability.hh"
 #include "mem/page_table.hh"
 #include "sim/process.hh"
+// #include "cpu/base_dyn_inst.hh"
 #include "debug/AliasCache.hh"
 
 
@@ -180,7 +181,7 @@ class LRUAliasCache
 
         ~LRUAliasCache();
 
-        bool Access(Addr vaddr, ThreadContext* tc, TheISA::PointerID* pid ) ;
+        bool Access(DynInstPtr& inst, ThreadContext* tc, TheISA::PointerID* pid ) ;
 
         bool InitiateAccess(Addr vaddr,ThreadContext* tc);
 
@@ -197,7 +198,7 @@ class LRUAliasCache
         bool Squash(uint64_t seqNum, bool include_inst);
 
         bool AccessStoreQueue(Addr effAddr, TheISA::PointerID* pid);
-
+        bool AccessStoreQueue(DynInstPtr& inst, TheISA::PointerID* pid);
         bool SquashEntry(uint64_t squashed_num);
 
         void print_stats() ;

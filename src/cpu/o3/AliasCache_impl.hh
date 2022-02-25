@@ -86,11 +86,12 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
         // from the table. In the case of a write, we need to update the
         // sqn of the entry in the case of a squash
     template <class Impl>
-    bool LRUAliasCache<Impl>::Access(Addr vaddr, ThreadContext* tc, TheISA::PointerID* pid )
+    bool LRUAliasCache<Impl>::Access(DynInstPtr& inst, ThreadContext* tc, TheISA::PointerID* pid )
     {
+            Addr vaddr = inst->effAddr;
             DPRINTF(AliasCache, " Access:: Access for EffAddr: 0x%x\n", vaddr);
             // first look into the SQ
-            bool SQHit = AccessStoreQueue(vaddr,pid);
+            bool SQHit = AccessStoreQueue(inst, pid);
             if (SQHit){
               return true;
             }
@@ -684,6 +685,39 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
        return false; // not in SQ
     }
 
+
+
+    template <class Impl>
+    bool LRUAliasCache<Impl>::AccessStoreQueue(DynInstPtr& inst, TheISA::PointerID* pid)
+    {
+      Addr effAddr = inst->effAddr;
+
+      DumpAliasTableBuffer();
+      //first look in Execute Alias store buffer
+      *pid = TheISA::PointerID(0);
+      for (auto exe_alias_buffer = ExeAliasTableBuffer.rbegin();
+                  exe_alias_buffer != ExeAliasTableBuffer.rend();
+                      ++exe_alias_buffer)
+      {
+          if (exe_alias_buffer->first->effAddr == effAddr)
+          {
+            DPRINTF(AliasCache, " AccessStoreQueue::Found an alias in Alias Cache Store Queue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+                  exe_alias_buffer->first->seqNum, 
+                  exe_alias_buffer->first->effAddr,
+                  exe_alias_buffer->second
+                  );
+        
+            *pid = exe_alias_buffer->second;
+            inst->setAliasStoreSeqNum(exe_alias_buffer->first->seqNum);
+            return true;  // found in SQ
+          }
+
+       }
+
+        DPRINTF(AliasCache, " AccessStoreQueue::Cannot Find an alias in Alias Cache Store Queue for EffAddr: 0x%x\n", 
+                effAddr);
+       return false; // not in SQ
+    }
 
     template <class Impl>
     bool LRUAliasCache<Impl>::SquashEntry(uint64_t squashed_num)

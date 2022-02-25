@@ -59,6 +59,7 @@
 #include "debug/O3PipeView.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
+#include "debug/SquashMech.hh"
 
 template<class Impl>
 LSQUnit<Impl>::WritebackEvent::WritebackEvent(DynInstPtr &_inst, PacketPtr _pkt,
@@ -1506,7 +1507,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
     cpu->numOfAliasTableAccess++;
     // threrefore we need to go to AliasCache
     TheISA::PointerID pid = TheISA::PointerID(0);
-    cpu->ExeAliasCache->Access(inst->effAddr, tc, &pid);
+    cpu->ExeAliasCache->Access(inst, tc, &pid);
 
     if (inst->macroop->getMacroopPid() != pid)
     {
@@ -1518,11 +1519,14 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             if (inst->macroop->getMacroopPid() == TheISA::PointerID(0) &&
                 pid != TheISA::PointerID(0))
             {
-                DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
                     inst->pcState().instAddr(),
                     inst->seqNum,
                     inst->macroop->getMacroopPid(),
-                    pid);
+                    pid,
+                    (inst->isAliasInTransition() ? "Yes" : "No"),
+                    (inst->isAliasInTransition() ? inst->getAliasStoreSeqNum() : 0)
+                    );
                 cpu->P0An++;
                 cpu->LVPTMissPredictP0An++;
                 cpu->updateFetchLVPT(inst, pid,
@@ -1544,11 +1548,15 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid != TheISA::PointerID(0))
             {
-                DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PMAN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
-                        inst->pcState().instAddr(),
-                        inst->seqNum,
-                        inst->macroop->getMacroopPid(),
-                        pid);
+                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
+                    inst->pcState().instAddr(),
+                    inst->seqNum,
+                    inst->macroop->getMacroopPid(),
+                    pid,
+                    (inst->isAliasInTransition() ? "Yes" : "No"),
+                    (inst->isAliasInTransition() ? inst->getAliasStoreSeqNum() : 0)
+                    );
+
                 cpu->PmAn++;
                 cpu->LVPTMissPredictPmAn++;
                 cpu->updateFetchLVPT(inst, pid,
@@ -1569,11 +1577,15 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
             {
-                DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PNA0 PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
                     inst->pcState().instAddr(),
                     inst->seqNum,
                     inst->macroop->getMacroopPid(),
-                    pid);
+                    pid,
+                    (inst->isAliasInTransition() ? "Yes" : "No"),
+                    (inst->isAliasInTransition() ? inst->getAliasStoreSeqNum() : 0)
+                    );
+
                 cpu->PnA0++;
                 cpu->LVPTMissPredictPnA0++;
                 cpu->updateFetchLVPT(inst, pid,
@@ -1598,11 +1610,14 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
       else
       {
 
-            DPRINTF(TypeTracker, "LSQUnit::mispredictedPID:: True Prediction Load Instruction: PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s\n",
+            DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: True Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
                     inst->pcState().instAddr(),
                     inst->seqNum,
                     inst->macroop->getMacroopPid(),
-                    pid);
+                    pid,
+                    (inst->isAliasInTransition() ? "Yes" : "No"),
+                    (inst->isAliasInTransition() ? inst->getAliasStoreSeqNum() : 0)
+                    );
                     
             cpu->updateFetchLVPT(inst, pid, pid, true);
             inst->MissPIDSquashType = MisspredictionType::NONE;

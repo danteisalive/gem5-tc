@@ -100,7 +100,7 @@ class BaseDynInst : public ExecContext, public RefCounted
 
 
 
-  protected:
+  public:
     enum Status {
         IqEntry,                 /// Instruction is in the IQ
         RobEntry,                /// Instruction is in the ROB
@@ -146,6 +146,7 @@ class BaseDynInst : public ExecContext, public RefCounted
         CapabilityChecked,
         AliasFetchStarted,
         AliasFetchComplete,
+        IsAliasInTransition,
         MaxFlags
     };
 
@@ -191,6 +192,7 @@ class BaseDynInst : public ExecContext, public RefCounted
      *  @todo: Not sure this should be here vs the derived class.
      */
     std::bitset<MaxInstSrcRegs> _readySrcRegIdx;
+
 
 
   public:
@@ -248,6 +250,8 @@ class BaseDynInst : public ExecContext, public RefCounted
     //bool capFetched;
     uint64_t capFetchCycle;
     uint64_t aliasFetchStartCycle;
+
+    uint64_t aliasStoreSeqNum;
 
     /////////////////////// TLB Miss //////////////////////
     /**
@@ -715,6 +719,17 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isBoundsCheckNeeded() const
     {return staticInst->isBoundsCheckNeeded();}
 
+    bool isAliasInTransition() const {return instFlags[IsAliasInTransition];}
+    uint64_t getAliasStoreSeqNum() const 
+    {
+        assert(instFlags[IsAliasInTransition] && "getAliasStoreSeqNum called when it's not in transition!\n");
+        return aliasStoreSeqNum; 
+    }
+    void setAliasStoreSeqNum(uint64_t seqNum) 
+    {
+        instFlags[IsAliasInTransition]  = true;
+        aliasStoreSeqNum = seqNum;
+    }
     void setFlag(StaticInstFlags::Flags f) { staticInst->setFlag(f); }
     void resetFlag(StaticInstFlags::Flags f) { staticInst->resetFlag(f); }
     void setFlag(Flags f) {instFlags[f] = true;}
