@@ -1,1 +1,1 @@
-# gem5-cap
+# gem5-tc
