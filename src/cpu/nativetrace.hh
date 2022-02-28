@@ -63,6 +63,9 @@ class NativeTraceRecord : public ExeTracerRecord
     }
 
     void dump();
+    void dump(std::ostream &outs){
+      outs << "IntelTraceRecord!\n";
+    }
 };
 
 class NativeTrace : public ExeTracer

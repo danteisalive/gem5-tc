@@ -53,6 +53,8 @@
 #include "cpu/simple/WordFM.hh"
 #include "cpu/timebuf.hh"
 #include "sim/probe/probe.hh"
+#include <fstream>
+
 
 struct DerivO3CPUParams;
 
@@ -263,8 +265,6 @@ class DefaultCommit
     void squashFromSquashAfter(ThreadID tid);
 
     void squashExecuteAliasTable(DynInstPtr &inst);
-
-
 
 
     /**

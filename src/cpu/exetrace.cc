@@ -126,7 +126,7 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
         if (Debug::ExecEffAddr && getMemValid())
             outs << " A=0x" << hex << addr;
 
-        if (Debug::ExecFetchSeq && fetch_seq_valid)
+        if (/*Debug::ExecFetchSeq &&*/ fetch_seq_valid)
             outs << "  FetchSeq=" << dec << fetch_seq;
 
         if (Debug::ExecCPSeq && cp_seq_valid)
@@ -157,6 +157,132 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
     }
 
     outs << endl;
+}
+
+
+void
+Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran, std::ostream &outs)
+{
+    
+    if (!Debug::ExecUser || !Debug::ExecKernel) {
+        bool in_user_mode = TheISA::inUserMode(thread);
+        if (in_user_mode && !Debug::ExecUser) return;
+        if (!in_user_mode && !Debug::ExecKernel) return;
+    }
+    
+    //if (Debug::ExecTicks)
+        dumpTicks(outs);
+
+    // outs << thread->getCpuPtr()->name() << " ";
+
+    // if (Debug::ExecAsid)
+    //     outs << "A" << dec << TheISA::getExecutingAsid(thread) << " ";
+
+    // if (Debug::ExecThread)
+    //     outs << "T" << thread->threadId() << " : ";
+
+    std::string sym_str;
+    Addr sym_addr;
+    Addr cur_pc = pc.instAddr();
+    outs << "0x" << hex << cur_pc << " : ";
+    if (debugSymbolTable && Debug::ExecSymbol &&
+            (!FullSystem || !inUserMode(thread)) &&
+            debugSymbolTable->findNearestSymbol(cur_pc, sym_str, sym_addr)) {
+        if (cur_pc != sym_addr)
+            sym_str += csprintf("+%d",cur_pc - sym_addr);
+        outs << "@" << sym_str;
+    } 
+    // else {
+    //     outs << "0x" << hex << cur_pc;
+    // }
+
+    if (inst->isMicroop()) {
+        outs << "." << setw(2) << dec << pc.microPC();
+    } else {
+        outs << "   ";
+    }
+
+    outs << " : ";
+
+    //
+    //  Print decoded instruction
+    //
+
+    outs << setw(26) << left;
+    outs << inst->disassemble(cur_pc, debugSymbolTable);
+
+    if (ran) {
+        outs << " : ";
+
+        //if (Debug::ExecOpClass) {
+            outs << Enums::OpClassStrings[inst->opClass()] << " : ";
+        //}
+
+        if ( !predicate) {
+            outs << "Predicated False";
+        }
+
+        if (data_status != DataInvalid) {
+            ccprintf(outs, " D=%#018x", data.as_int);
+        }
+
+        if (getMemValid())
+            outs << " A=0x" << hex << addr;
+
+        if (fetch_seq_valid)
+            outs << "  FetchSeq=" << dec << fetch_seq;
+
+        if (cp_seq_valid)
+            outs << "  CPSeq=" << dec << cp_seq;
+
+        // if (Debug::ExecFlags) {
+            outs << "  flags=(";
+            inst->printFlags(outs, "|");
+            outs << ")";
+        // }
+    }
+
+    //
+    //  End of line...
+    //
+
+    if (inst->isMicroop())
+    {
+        outs << " " << inst->getStaticPointerID() ;
+    }
+    else if (inst->isMacroop())
+    {
+        outs << " " << inst->getMacroopPid();
+    }
+    else
+    {
+        outs << "PID(UNK)";
+    }
+
+    outs << endl;
+}
+
+void
+Trace::ExeTracerRecord::dump(std::ostream &outs)
+{
+    /*
+     * The behavior this check tries to achieve is that if ExecMacro is on,
+     * the macroop will be printed. If it's on and microops are also on, it's
+     * printed before the microops start printing to give context. If the
+     * microops aren't printed, then it's printed only when the final microop
+     * finishes. Macroops then behave like regular instructions and don't
+     * complete/print when they fault.
+     */
+    // if (Debug::ExecMacro && staticInst->isMicroop() &&
+    //     ((Debug::ExecMicro &&
+    //         macroStaticInst && staticInst->isFirstMicroop()) ||
+    //         (!Debug::ExecMicro &&
+    //          macroStaticInst && staticInst->isLastMicroop()))) {
+    //     traceInst(macroStaticInst, false);
+    // }
+    //if (Debug::ExecMicro || !staticInst->isMicroop()) {
+        traceInst(staticInst, true, outs);
+    //}
 }
 
 void

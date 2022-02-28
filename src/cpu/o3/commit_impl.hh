@@ -149,6 +149,14 @@ DefaultCommit<Impl>::DefaultCommit(O3CPU *_cpu, DerivO3CPUParams *params)
         squashAfterInst[tid] = NULL;
     }
     interrupt = NoFault;
+
+    std::ofstream tyCHEExecutionSanityCheck;
+    if (params->enable_capability)
+        tyCHEExecutionSanityCheck.open("./m5out/ExecSanityTyche.tyche", std::ios_base::out);
+    else 
+        tyCHEExecutionSanityCheck.open("./m5out/ExecSanityRaw.tyche", std::ios_base::out);
+    tyCHEExecutionSanityCheck.close();
+
 }
 
 template <class Impl>
@@ -1328,15 +1336,44 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         cpu->PointerDepGraph.doCommit(head_inst);
     }
 
+
+
     if (head_inst->traceData) {
         head_inst->traceData->setFetchSeq(head_inst->seqNum);
         head_inst->traceData->setCPSeq(thread[tid]->numOp);
         head_inst->traceData->dump();
+
+        if (tc->enableCapability &&
+            (head_inst->isLoad() || head_inst->isStore()) &&
+            (!head_inst->isMicroopInjected()) && 
+            cpu->fetch.TrackAlias(tc, head_inst->pcState().pc())
+            )
+        {
+            cpu->PointerDepGraph.checkTyCHESanity(head_inst, tc);
+        }
+        
         delete head_inst->traceData;
         head_inst->traceData = NULL;
     }
 
 
+
+
+
+
+    if (head_inst->isStore())
+    {
+        std::ofstream tyCHEExecutionSanityCheck;
+        if (tc->enableCapability)
+            tyCHEExecutionSanityCheck.open("./m5out/ExecSanityTyche.tyche", std::ios_base::app);
+        else 
+            tyCHEExecutionSanityCheck.open("./m5out/ExecSanityRaw.tyche", std::ios_base::app);
+
+        tyCHEExecutionSanityCheck << std::hex << head_inst->instAddr() << " " << 
+                                     std::dec << (uint64_t)cpu->committedOps[tid].value() <<
+                                     std::endl;
+        tyCHEExecutionSanityCheck.close();
+    }
 
     if (head_inst->isReturn()) {
         DPRINTF(Commit,"Return Instruction Committed [sn:%lli] PC %s  \
@@ -1433,10 +1470,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
     }
 
     if (tc->enableCapability && head_inst->isBoundsCheckMicroop()){
-    //  if (head_inst->dyn_pid != TheISA::PointerID(0))
-    //  {
         cpu->NumOfCommitedBoundsCheck++;
-    //  }
     }
 
     if ((tc->enableCapability) &&
@@ -1809,6 +1843,8 @@ DefaultCommit<Impl>::getInsts()
 
 
 
+
+
 template <class Impl>
 void
 DefaultCommit<Impl>::markCompletedInsts()
@@ -1843,7 +1879,7 @@ DefaultCommit<Impl>::updateComInstStats(DynInstPtr &inst)
 
     // To match the old model, don't count nops and instruction
     // prefetches towards the total commit count.
-    if (!inst->isNop() && !inst->isInstPrefetch()) {
+    if (!inst->isMicroopInjected() && !inst->isNop() && !inst->isInstPrefetch()) {
         cpu->instDone(tid, inst);
     }
 

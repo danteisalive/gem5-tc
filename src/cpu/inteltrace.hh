@@ -54,6 +54,9 @@ class IntelTraceRecord : public InstRecord
     }
 
     void dump();
+    void dump(std::ostream &outs){
+      outs << "IntelTraceRecord!\n";
+    }
 };
 
 class IntelTrace : public InstTracer

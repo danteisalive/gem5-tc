@@ -46,8 +46,9 @@
 #include "arch/x86/generated/decoder.hh"
 #include "cpu/o3/comm.hh"
 #include "debug/TypeTracker.hh"
-
+#include <fstream>
 #include "config/the_isa.hh"
+#include "cpu/exetrace.hh"
 
 /** Node in a linked list. */
 template <class Impl>
@@ -93,6 +94,9 @@ class PointerDependencyGraph
             FetchArchRegsPid[i] = TheISA::PointerID(0);
             CommitArchRegsPid[i] = TheISA::PointerID(0);
         }
+        std::ofstream TyCHEAliasSanityCheckFile;
+        TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::fstream::out);
+        TyCHEAliasSanityCheckFile.close();
     }
 
     ~PointerDependencyGraph();
@@ -122,6 +126,8 @@ class PointerDependencyGraph
     void dump();
 
 
+    bool checkTyCHESanity(DynInstPtr&, ThreadContext* tc);
+    TheISA::PointerID readPIDFromIntervalTree(Addr vaddr, ThreadContext* tc);
 
   private:
     /** Array of linked lists.  Each linked list is a list of all the
@@ -140,6 +146,8 @@ class PointerDependencyGraph
 
     // Debug variable, remove when done testing.
     unsigned memAllocCounter;
+
+    //std::ofstream TyCHEAliasSanityCheckFile;
 
     void TransferMovMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferStoreMicroops(DynInstPtr &inst, bool track, bool sanity);

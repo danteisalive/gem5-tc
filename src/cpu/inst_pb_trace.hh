@@ -76,6 +76,10 @@ class InstPBTraceRecord : public InstRecord
      * protobuf file
      */
     void dump() override;
+    void dump(std::ostream &outs)
+    {
+      outs << "InstPBTraceRecord\n";
+    }
 
   protected:
     InstPBTrace& tracer;

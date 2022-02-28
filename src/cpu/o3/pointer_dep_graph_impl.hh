@@ -580,6 +580,94 @@ PointerDependencyGraph<Impl>::dump()
 
 }
 
+
+
+
+template <class Impl>
+bool 
+PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadContext* tc)
+{
+
+    
+    if (head_inst->isLoad())
+    {
+        assert(head_inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )head_inst->staticInst.get(); 
+        assert(inst_regop != nullptr && "inst_regop is null!\n"); 
+        const uint8_t dataSize = inst_regop->dataSize;
+        assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)head_inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(head_inst->srcRegIdx(0)); src0 = src0;//index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(head_inst->srcRegIdx(1)); src1 = src1;//base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(head_inst->destRegIdx(0)); //dest
+
+        // check whether this is a pointer refill and whether it's tracking the right PID/TID
+        if (dataSize == 8)
+        {
+            // read the data
+            TheISA::PointerID _pid = readPIDFromIntervalTree(dest, tc); 
+
+            if ((_pid != head_inst->dyn_pid) || (_pid != TheISA::PointerID(0)))
+            {
+                
+                Trace::InstRecord * trace = head_inst->traceData;
+                Trace::ExeTracerRecord * execTraceRecord = dynamic_cast<Trace::ExeTracerRecord*>(trace);
+                assert(execTraceRecord && "null trace is found!\n");
+                std::ofstream TyCHEAliasSanityCheckFile;
+                // File Open
+                TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
+                
+                
+
+                if (execTraceRecord)
+                    execTraceRecord->dump(TyCHEAliasSanityCheckFile);
+                // File Close
+                TyCHEAliasSanityCheckFile.close();
+            }
+        }
+
+        return true;
+        // Boulds check could be any size
+        // check bounds check sanity!
+
+    }
+
+
+
+
+    return true;
+}
+
+
+template <class Impl>
+TheISA::PointerID
+PointerDependencyGraph<Impl>::readPIDFromIntervalTree(Addr vaddr, ThreadContext* tc)
+{
+
+
+    Block fake;
+    fake.payload = vaddr;
+    fake.req_szB = 1;
+    UWord foundkey = 1;
+    UWord foundval = 1;
+    unsigned char found = VG_lookupFM( tc->interval_tree,
+                                        &foundkey, &foundval, (UWord)&fake );
+    if (!found) {
+        return TheISA::PointerID(0);
+    }
+
+    assert(foundval == 0 && "foundval == 0\n");  
+    assert(foundkey != 1 && "foundkey != 1\n");
+    Block* res = (Block*)foundkey;
+    assert(res != &fake && "res != &fake\n");
+
+    return TheISA::PointerID(res->pid);
+
+}
+
+
 template <class Impl>
 void
 PointerDependencyGraph<Impl>::doUpdate(DynInstPtr& inst)

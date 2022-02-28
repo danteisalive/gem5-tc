@@ -127,7 +127,10 @@ class TarmacBaseRecord : public InstRecord
                      const StaticInstPtr _macroStaticInst = NULL);
 
     virtual void dump() = 0;
-
+    void dump(std::ostream &outs)
+    {
+      outs << "TarmacBaseRecord\n";
+    }
     /**
      * Returns the Instruction Set State according to the current
      * PCState.

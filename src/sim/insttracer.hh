@@ -191,6 +191,11 @@ class InstRecord
 
     virtual void dump() = 0;
 
+    virtual void dump(std::ofstream& out)
+    {
+      panic("Called the wrong version of the dump! This should be implemented if you want to use it!\n");
+    }
+
   public:
     Tick getWhen() const { return when; }
     ThreadContext *getThread() const { return thread; }
