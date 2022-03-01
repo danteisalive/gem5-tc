@@ -607,25 +607,34 @@ PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadCont
         if (dataSize == 8)
         {
             // read the data
-            TheISA::PointerID _pid = readPIDFromIntervalTree(dest, tc); 
+            uint64_t  dataRegContent = 
+                    head_inst->readDestReg(head_inst->staticInst.get(), 0); 
+            TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
 
-            if ((_pid != head_inst->dyn_pid) || (_pid != TheISA::PointerID(0)))
-            {
-                
-                Trace::InstRecord * trace = head_inst->traceData;
-                Trace::ExeTracerRecord * execTraceRecord = dynamic_cast<Trace::ExeTracerRecord*>(trace);
-                assert(execTraceRecord && "null trace is found!\n");
+            DPRINTF(PointerDepGraph, "checkTyCHESanity:: Checking Alias for dataRegContent[%s]=%x\n", 
+                    TheISA::IntRegIndexStr(dest), dataRegContent);
+
+
+            Trace::InstRecord * trace = head_inst->traceData;
+            Trace::ExeTracerRecord * execTraceRecord = dynamic_cast<Trace::ExeTracerRecord*>(trace);
+            assert(execTraceRecord && "null trace is found!\n");
+
+            if ((_pid != TheISA::PointerID(0)) || (head_inst->dyn_pid != TheISA::PointerID(0)))
+            {   
                 std::ofstream TyCHEAliasSanityCheckFile;
                 // File Open
                 TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
-                
-                
+                TyCHEAliasSanityCheckFile << _pid << " " << head_inst->dyn_pid << "\n"; 
+                    
 
                 if (execTraceRecord)
                     execTraceRecord->dump(TyCHEAliasSanityCheckFile);
                 // File Close
                 TyCHEAliasSanityCheckFile.close();
             }
+
+            assert((_pid == head_inst->dyn_pid) && 
+                        "Cannot verify that alias and dynamic pid are the same!\n");
         }
 
         return true;

@@ -1574,7 +1574,7 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 if (instruction->isMallocBaseCollectorMicroop() ||
                     instruction->isCallocBaseCollectorMicroop() )
                 {
-                    uint64_t _PID = cpu->readArchIntReg(X86ISA::INTREG_R16, instruction->threadNumber) + 1;
+                    uint64_t _PID = cpu->readArchIntReg(X86ISA::INTREG_R16, instruction->threadNumber);
                     uint64_t _TID = thisPC.pc();
                     instruction->dyn_pid = TheISA::PointerID(_PID, _TID);
                 }

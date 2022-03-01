@@ -70,6 +70,7 @@
 #include "sim/full_system.hh"
 #include "debug/Capability.hh"
 #include "debug/TypeTracker.hh"
+#include "debug/Allocator.hh"
 
 using namespace std;
 
@@ -1545,7 +1546,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
 
-        DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+        DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "MALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 _pid_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
@@ -1559,7 +1560,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
         uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
 
-        DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+        DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "MALLOC BASE=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 _pid_base, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
@@ -1605,7 +1606,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         {
             cpu->ExeAliasCache->Invalidate(tc, _pid);
 
-            DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+            DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                     "FREE CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
                     _pid_base, _pid, inst->seqNum, inst->pcState().instAddr());
         }
@@ -1613,7 +1614,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     }
     else if (inst->isFreeRetMicroop()){
 
-      DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::FREE RET CALL\n");
+      DPRINTF(Allocator, "DefaultCommit<Impl>::collector::FREE RET CALL\n");
       
     }
     else if (inst->isCallocSizeCollectorMicroop()){
@@ -1628,7 +1629,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       tc->ap_pid = _pid_num;
       tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
 
-      DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+      DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "CALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 tc->ap_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
@@ -1642,7 +1643,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
          uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
          uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
 
-         DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+         DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "CALLOC BASE=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 _pid_base, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
@@ -1681,7 +1682,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       tc->ap_pid = _pid_num;
       tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
 
-      DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+      DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "REALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 tc->ap_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
@@ -1706,7 +1707,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       {
         cpu->ExeAliasCache->Invalidate(tc, _pid);
 
-        DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+        DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "REALLOC CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 old_base_addr, _pid, inst->seqNum, inst->pcState().instAddr());
       }
@@ -1722,7 +1723,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
             uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
 
-            DPRINTF(TypeTracker, "DefaultCommit<Impl>::collector::"
+            DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "REALLOC BASE=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
                 _pid_base, _pid_num, inst->seqNum, inst->pcState().instAddr());
 
