@@ -71,6 +71,7 @@
 #include "debug/Capability.hh"
 #include "debug/TypeTracker.hh"
 #include "debug/Allocator.hh"
+#include "debug/AliasCache.hh"
 
 using namespace std;
 
@@ -1312,15 +1313,21 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
        collector(tid, head_inst);
     }
 
-    DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s\n %s\n",
+    DPRINTF(Commit, "Committing instruction with [sn:%lli] PC %s %s\n",
                     head_inst->seqNum, head_inst->pcState(),
                     si->disassemble(head_inst->pcState().pc())
                   );
+
+    DPRINTF(AliasCache, "State of Aliases before Removel of Stack Aliases:\n");
+    cpu->ExeAliasCache->DumpAliasTableBuffer();
+    cpu->ExeAliasCache->DumpAliasCache();
+    cpu->ExeAliasCache->DumpShadowMemory(tc);
 
     if (tc->enableCapability){
       cpu->updatePIDHistory(head_inst);
     }
 
+        
     if (tc->enableCapability){
 
       if (head_inst->isStore()){
@@ -1330,6 +1337,11 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
       cpu->ExeAliasCache->RemoveStackAliases(cpu->readArchIntReg(X86ISA::INTREG_RSP,tid), tc);
 
     }
+
+    DPRINTF(AliasCache, "State of Aliases after Removel of Stack Aliases:\n");
+    cpu->ExeAliasCache->DumpAliasTableBuffer();
+    cpu->ExeAliasCache->DumpAliasCache();
+    cpu->ExeAliasCache->DumpShadowMemory(tc);
 
     if (tc->enableCapability &&
         cpu->fetch.TrackAlias(tc, head_inst->pcState().pc()))
@@ -1356,8 +1368,6 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         delete head_inst->traceData;
         head_inst->traceData = NULL;
     }
-
-
 
 
 

@@ -734,17 +734,6 @@ LSQUnit<Impl>::executeLoad(DynInstPtr &inst, ThreadID tid)
           }
     }
 
-    /*if (tc->enableCapability &&
-       !inst->isBoundsCheckMicroop() &&
-       load_fault == NoFault)
-    {
-        if (!inst->isAliasFetchComplete())
-        {
-           DPRINTF(LSQUnit, "Alias Fetch is not completed: %s, [sn:%lli]\n",
-                    inst->pcState(), inst->seqNum);
-           return load_fault;
-        }
-    }*/
 
     if (inst->isTranslationDelayed() &&
         load_fault == NoFault)
@@ -845,9 +834,47 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
     panic_if(!store_inst->effAddrValid(), "store effAddr is not valid!");
 
+
+    LSQUpdateAliasTableUsingPointerTracker(tid, store_inst);
+    
     return checkViolations(load_idx, store_inst);
 
 }
+
+
+
+template <class Impl>
+void
+LSQUnit<Impl>::LSQUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPtr &inst)
+{
+  
+  ThreadContext * tc = cpu->tcBase(tid); 
+  assert(inst->isStore());
+  panic_if(!inst->effAddrValid(), "store effAddr is not valid!");
+  assert(tc->enableCapability);
+  assert (!inst->isMicroopInjected()) ;
+  assert (!inst->isBoundsCheckMicroop()) ;
+
+
+  const StaticInstPtr si = inst->staticInst;
+  
+  if (si->getName() != "st" && si->getName() != "stis") return;
+  // datasize should be 8 bytes othersiwe it's not a base address
+  if (si->getDataSize() != 8) return; // only for 64 bits system
+       // return if store is not pointed to the DS or SS section
+  if (!( si->getSegment() == TheISA::SEGMENT_REG_DS ||
+            si->getSegment() == TheISA::SEGMENT_REG_SS)) return;
+
+  // srcReg[2] in store microops is the register that
+  //we want to write its value to mem
+  uint64_t  dataRegContent =
+                    inst->readIntRegOperand(inst->staticInst.get(),2); // src(2) is the data register
+
+  DPRINTF(TypeTracker, "LSQUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", inst->seqNum, inst->effAddr, inst->dyn_pid, dataRegContent);
+  cpu->ExeAliasCache->InsertStoreQueue(inst);
+
+}
+
 
 template <class Impl>
 void
@@ -1547,7 +1574,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid != TheISA::PointerID(0))
             {
-                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
+                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PNAM PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
                     inst->pcState().instAddr(),
                     inst->seqNum,
                     inst->macroop->getMacroopPid(),
@@ -1574,7 +1601,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
             else if (inst->macroop->getMacroopPid() != TheISA::PointerID(0) &&
                      pid == TheISA::PointerID(0))
             {
-                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
+                DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: False Prediction Load Instruction! Type: PNA0 PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
                     inst->pcState().instAddr(),
                     inst->seqNum,
                     inst->macroop->getMacroopPid(),
@@ -1605,7 +1632,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
       else
       {
 
-            DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: True Prediction Load Instruction! Type: P0AN PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
+            DPRINTF(SquashMech, "LSQUnit::mispredictedPID:: True Prediction Load Instruction! PC Addr=0x%x SeqNum=%d Predicted PID=%s Actual PID=%s AliasInTrans.: [%s][%d]\n",
                     inst->pcState().instAddr(),
                     inst->seqNum,
                     inst->macroop->getMacroopPid(),

@@ -106,7 +106,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
 
             assert(thisIsTheSet < NumSets);
 
-
+            DumpAliasCache();
             for (size_t wayNum = 0; wayNum < NumWays; wayNum++) {
 
                 if (AliasCache[thisIsTheSet][wayNum].valid &&
@@ -173,6 +173,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
             // PID(0). In this case just send it back and do not update
             // alias cache as it will just polute the cache and deacrese the
             // hit rate. If there is a page for it update the cache in any case
+            DumpShadowMemory(tc);
             Process *p = tc->getProcessPtr();
             Addr vpn = p->pTable->pageAlign(vaddr); // find the vpn
             auto it_lv1 = tc->ShadowMemory.find(vpn);
@@ -299,7 +300,8 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
 
 
       auto it = ExeAliasTableBuffer.begin();
-      while(it != ExeAliasTableBuffer.end()) {
+      while(it != ExeAliasTableBuffer.end()) 
+      {
 
             if (it->first->seqNum == storeSeqNum &&
                 it->first->effAddr == vaddr)
@@ -320,10 +322,12 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                 {
                   commited = Commit(it->first->effAddr, tc, writeback_pid);
                 }
-                //delete from alias store buffer
-                it = ExeAliasTableBuffer.erase(it);
                 DPRINTF(AliasCache, "LRUAliasCache::CommitStore:: %s Alias with VAddr=0x%x PID=%s to Shadow Memory!\n",
                         commited ? "COMMITED":"DID NOT COMMIT" ,it->first->effAddr, writeback_pid);
+                //delete from alias store buffer
+                it = ExeAliasTableBuffer.erase(it);
+
+                DumpAliasCache();
                 DumpShadowMemory(tc);
                 return true;
             }
@@ -757,7 +761,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     void LRUAliasCache<Impl>::DumpAliasTableBuffer (){
       //dump for debugging
       for (auto& entry : ExeAliasTableBuffer) {
-        DPRINTF(AliasCache, "Alias Cache:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
+        DPRINTF(AliasCache, "AliasTableBuffer[SeqNum: %d][EffAddr: 0x%x] [PID=%s]\n", 
                   entry.first->seqNum, 
                   entry.first->effAddr,
                   entry.second
@@ -786,7 +790,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
           for (size_t wayNum = 0; wayNum < NumWays; wayNum++) {
             if (AliasCache[setNum][wayNum].valid)
             {
-                DPRINTF(AliasCache, "Alias Cache[%d][%d]=(0x%x,%s,%d)\n", 
+                DPRINTF(AliasCache, "AliasCache[%d][%d]=(0x%x,%s,%d)\n", 
                     setNum, wayNum,
                     AliasCache[setNum][wayNum].vaddr, 
                     AliasCache[setNum][wayNum].pid,

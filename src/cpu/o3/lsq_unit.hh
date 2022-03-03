@@ -139,6 +139,8 @@ class LSQUnit {
      */
     Fault checkViolations(int load_idx, DynInstPtr &inst);
 
+    void LSQUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPtr &inst);
+
     /** Check if an incoming invalidate hits in the lsq on a load
      * that might have issued out of order wrt another load beacuse
      * of the intermediate invalidate.

@@ -1476,6 +1476,9 @@ DefaultIEW<Impl>::executeInsts()
             } else if (inst->isStore()) {
                 fault = ldstQueue.executeStore(inst);
 
+                // only stores can update ExeAliasTable
+                
+                
                 if (inst->isTranslationDelayed() &&
                     fault == NoFault) {
                     // A hw page table walk is currently going on; the
@@ -1485,6 +1488,8 @@ DefaultIEW<Impl>::executeInsts()
                     instQueue.deferMemInst(inst);
                     continue;
                 }
+
+                //IEWUpdateAliasTableUsingPointerTracker(inst->threadNumber, inst);
 
                 // If the store had a fault then it may not have a mem req
                 if (fault != NoFault || !inst->readPredicate() ||
@@ -1693,12 +1698,6 @@ DefaultIEW<Impl>::writebackInsts()
 
             if (tc->enableCapability){
 
-                // only stores can update ExeAliasTable
-                if (inst->isStore())
-                {
-                    IEWUpdateAliasTableUsingPointerTracker(inst->threadNumber, inst);
-                }
-
                 if (inst->isBoundsCheckMicroop()){
                     cpu->NumOfExecutedBoundsCheck++;
                 } 
@@ -1821,6 +1820,9 @@ DefaultIEW<Impl>::tick()
                 ppToCommit->notify(inst);
             }
         }
+
+        
+
         checkSignalsAndUpdate(tid);
         dispatch(tid);
     }
@@ -2011,6 +2013,7 @@ DefaultIEW<Impl>::IEWUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPt
   
   ThreadContext * tc = cpu->tcBase(tid); 
   assert(inst->isStore());
+  panic_if(!inst->effAddrValid(), "store effAddr is not valid!");
   assert(tc->enableCapability);
   assert (!inst->isMicroopInjected()) ;
   assert (!inst->isBoundsCheckMicroop()) ;

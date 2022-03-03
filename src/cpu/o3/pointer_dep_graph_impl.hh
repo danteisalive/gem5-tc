@@ -624,17 +624,24 @@ PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadCont
                 std::ofstream TyCHEAliasSanityCheckFile;
                 // File Open
                 TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
                 TyCHEAliasSanityCheckFile << _pid << " " << head_inst->dyn_pid << "\n"; 
-                    
+                
+                if ((_pid != head_inst->dyn_pid))
+                    TyCHEAliasSanityCheckFile << "Failed to verify that alias and dynamic pid are the same!\n";
 
                 if (execTraceRecord)
                     execTraceRecord->dump(TyCHEAliasSanityCheckFile);
+                
                 // File Close
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
                 TyCHEAliasSanityCheckFile.close();
+                assert((_pid == head_inst->dyn_pid) &&
+                        "Failed to verify that alias and dynamic pid are the same!\n");
             }
 
-            assert((_pid == head_inst->dyn_pid) && 
-                        "Cannot verify that alias and dynamic pid are the same!\n");
+            
+
         }
 
         return true;
@@ -1397,21 +1404,35 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
         panic_if((dataSize == 8) &&
                 (inst_sub != nullptr || inst_sub_big != nullptr) &&  
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
-                "TransferStoreMicroops :: Found a Sub inst with both regs non-zero PID! "
+                "TransferSubMicroops :: Found a Sub inst with both regs non-zero PID! "
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
 
-        // this is not acceptable for Sub/SubBig
-        panic_if((dataSize == 8) &&
-                (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr) &&  
-                (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)) && 
-                (CommitArchRegsPid[src1] != CommitArchRegsPid[src0]), 
-                "TransferStoreMicroops :: Found a SubFlag* inst with both regs non-zero PID and not equal! "
-                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+        // this is not acceptable for SubFlag/SubFlagBig
+        if( (dataSize == 8) &&
+            (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr) &&  
+            (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)) && 
+            (CommitArchRegsPid[src1] != CommitArchRegsPid[src0]))
+        {
+                std::ofstream TyCHEAliasSanityCheckFile;
+                TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+                
+                TyCHEAliasSanityCheckFile << "Failed to verify TransferSubInst!\n";
+                TyCHEAliasSanityCheckFile << 
+                    "TransferSubMicroops :: Found a SubFlag* inst with both regs non-zero PID and not equal!\n" <<
+                    "SRC1 =" << CommitArchRegsPid[src0] << " " <<
+                    "SRC2 = " << CommitArchRegsPid[src1] << "\n";
+            
+                // File Close
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+                TyCHEAliasSanityCheckFile.close();
+        } 
+
 
         // dest = src0(PID(0)) - src1(PID(n))
         panic_if((dataSize == 8) && 
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] == TheISA::PointerID(0)), 
-                "TransferStoreMicroops :: Found a Sub inst with src1 reg non-zero PID but src0 reg zeo PID! "
+                "TransferSubMicroops :: Found a Sub inst with src1 reg non-zero PID but src0 reg zeo PID! "
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
 
         return;

@@ -1102,21 +1102,22 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   cpu->ExeAliasCache->DumpShadowMemory(tc);
   if (it != tc->ShadowMemory.end() && it->second.size() != 0)
   {
-    // there is an alias --> go to alias cache
-    // check to see if there is a miss or hit for this access
-    if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc)){
-      // if this is miss return and wait
-      // otherwise continue executing the load
-      DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Alias found in shadow memory for VAddr=0x%x but it's a miss in alias cache! Waiting!\n", vaddr);
-      instFlags[AliasFetchComplete] = false;
-      return true;
-    }
-    else {
-    DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Alias found in shadow memory for VAddr=0x%x and it's a hit in alias cache! Servicing!\n", vaddr);
-      // hit and threrefore no need to wait
-      instFlags[AliasFetchComplete] = true;
-      return false;
-    }
+        // there is an alias --> go to alias cache
+        // check to see if there is a miss or hit for this access
+        if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc))
+        {
+            // if this is miss return and wait
+            // otherwise continue executing the load
+            DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Alias found in shadow memory for VAddr=0x%x but it's a miss in alias cache! Waiting!\n", vaddr);
+            instFlags[AliasFetchComplete] = false;
+            return true;
+        }
+        else {
+            DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::Alias found in shadow memory for VAddr=0x%x and it's a hit in alias cache! Servicing!\n", vaddr);
+            // hit and threrefore no need to wait
+            instFlags[AliasFetchComplete] = true;
+            return false;
+        }
   }
   else{
     DPRINTF(TypeTracker, "BaseDynInst<Impl>::isAliasCacheMissed::No Alias Found For VAddr=0x%x\n", vaddr);
