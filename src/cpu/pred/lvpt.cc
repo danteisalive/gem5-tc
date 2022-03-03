@@ -151,6 +151,10 @@ TheISA::PointerID
 DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
 {
 
+    //assert(inst->isLoad() && "LVPT Loopkup is called for a non-load instruction!\n");
+
+    DPRINTF(Capability, "lookup:: LVPT is making a Prediction [pc:%x] = %s\n", 
+                        instPC, inst->disassemble(instPC));
 
     unsigned lvpt_idx = getIndex(instPC, tid);
 
@@ -167,17 +171,33 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
       {
           switch (localCtrs[lvpt_idx].read()) {
             case 0x0:
-              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.GetPointerID() +
-                                      localBiases[lvpt_idx]);
-              break;
-            case 0x1:
-              pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.GetPointerID() +
-                                      localBiases[lvpt_idx]);
+              // pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.GetPointerID() +
+              //                         localBiases[lvpt_idx]);
 
-              break;
+              // DPRINTF(Capability, "lookup:: LVPT is Returning a Prediction for [pc:%x][%s] = [%s][%d]\n", 
+              //                     instPC, inst->disassemble(instPC), pred_pid, localCtrs[lvpt_idx].read());
+              // panic_if(pred_pid.GetPointerID() != 0 && pred_pid.GetTypeID() == 0, 
+              //         "Target has TID equal to 0!\n");
+              // break;
+
+            case 0x1:
+              // pred_pid = TheISA::PointerID(lvpt[lvpt_idx].target.GetPointerID() +
+              //                         localBiases[lvpt_idx]);
+
+              // DPRINTF(Capability, "lookup:: LVPT is Returning a Prediction for [pc:%x][%s] = [%s][%d]\n", 
+              //                     instPC, inst->disassemble(instPC), pred_pid, localCtrs[lvpt_idx].read());
+              // panic_if(pred_pid.GetPointerID() != 0 && pred_pid.GetTypeID() == 0, 
+              //         "Target has TID equal to 0!\n");
+              // break;
+
             case 0x2:
             case 0x3:
               pred_pid = lvpt[lvpt_idx].target;
+
+              DPRINTF(Capability, "lookup:: LVPT is Returning a Prediction for [pc:%x][%s] = [%s][%d]\n", 
+                                  instPC, inst->disassemble(instPC), pred_pid, localCtrs[lvpt_idx].read());
+              panic_if(pred_pid.GetPointerID() != 0 && pred_pid.GetTypeID() == 0, 
+                      "Target has TID equal to 0!\n");
               break;
 
             default:
@@ -192,11 +212,17 @@ DefaultLVPT::lookup(StaticInstPtr inst, Addr instPC, ThreadID tid)
       inst->PredictionConfidenceLevel = (int)confLevel[lvpt_idx].read();
       inst->PredictionPointerRefillConfidence =
                                 (int)localPointerPredictor[lvpt_idx].read();
+
+
       return pred_pid;
 
     }
     else
     {
+
+        DPRINTF(Capability, "lookup:: LVPT is Returning a Prediction for [pc:%x][%s] = [%s][%d]\n", 
+                            instPC, inst->disassemble(instPC), TheISA::PointerID(0), localCtrs[lvpt_idx].read());
+
         inst->PredictionConfidenceLevel = 0;
         inst->PredictionPointerRefillConfidence = 0;
         return TheISA::PointerID(0);
@@ -214,7 +240,11 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
                    )
 {
 
+    DPRINTF(Capability, "updateAndSnapshot:: LVPT is Updating and Taking an Snapshot [pc:%x][sn:%d][predict:%d]: target = %s predicted_pid = %s\n", 
+                        instPC, seqNum, predict, target, predicted_pid);
 
+    panic_if(target.GetPointerID() != 0 && target.GetTypeID() == 0, "Target has TID equal to 0!\n");
+    panic_if(predicted_pid.GetPointerID() != 0 && predicted_pid.GetTypeID() == 0, "predicted_pid has TID equal to 0!\n");
 
     if (predict){
       panic_if(predicted_pid.GetPointerID() != target.GetPointerID(),
@@ -279,14 +309,6 @@ DefaultLVPT::updateAndSnapshot(TheISA::PCState pc,
       }
     }
 
-    //we dont want to pullote our cache with non refill loads but we need to
-    // have the history
-    //if (target.GetPointerID() == 0){
-        //either predicted true or false
-    //    banList[lvpt_idx][instPC]++;
-        //return;
-    //}
-
     update(instPC, target, tid, predict);
 
 
@@ -298,6 +320,12 @@ DefaultLVPT::update(Addr instPC,
                     ThreadID tid, bool predict
                    )
 {
+
+
+    DPRINTF(Capability, "update:: LVPT is Updating [pc:%x][predict:%d]: target = %s\n", 
+                        instPC, predict, target);
+
+    panic_if(target.GetPointerID() != 0 && target.GetTypeID() == 0, "Target has TID equal to 0!\n");
 
     unsigned lvpt_idx = getIndex(instPC, tid);
 
@@ -377,21 +405,19 @@ DefaultLVPT::squashAndUpdate(const InstSeqNum &squashed_sn,
 
     assert(pred_hist_it->second.lvptIdx == lvpt_idx);
 
-    //if (pred_hist_it->second.targetPID.GetPointerID() != 0){
+
       lvpt[lvpt_idx].tag = history->lvptEntry.tag;
       lvpt[lvpt_idx].tid = history->lvptEntry.tid;
       lvpt[lvpt_idx].valid = history->lvptEntry.valid;
       lvpt[lvpt_idx].target = history->lvptEntry.target;
       localCtrs[lvpt_idx].write(history->localCtrEntry.read());
       localBiases[lvpt_idx] = history->localBiasEntry;
-    //}
 
     delete history;
 
     pred_hist.erase(pred_hist_it);
-    //now update with correct pid
-    //if (corr_pid != TheISA::PointerID(0))
-      update(pc.instAddr(), corr_pid, tid, true);
+
+    update(pc.instAddr(), corr_pid, tid, true);
 
 }
 
@@ -411,28 +437,29 @@ DefaultLVPT::squash(const InstSeqNum &squashed_sn, ThreadID tid)
        ++next_it;
        if (pred_hist_it->second.seqNum > squashed_sn)
        {
-          LVPTHistory *history =
-             static_cast<LVPTHistory*>(pred_hist_it->second.lvptEntryHistory);
+            LVPTHistory *history =
+              static_cast<LVPTHistory*>(pred_hist_it->second.lvptEntryHistory);
 
-          uint64_t lvpt_idx = pred_hist_it->second.lvptIdx;
+            uint64_t lvpt_idx = pred_hist_it->second.lvptIdx;
 
-          //if (pred_hist_it->second.targetPID.GetPointerID() != 0)
-          //{
-              lvpt[lvpt_idx].tag = history->lvptEntry.tag;
-              lvpt[lvpt_idx].tid = history->lvptEntry.tid;
-              lvpt[lvpt_idx].valid = history->lvptEntry.valid;
-              lvpt[lvpt_idx].target = history->lvptEntry.target;
-              localCtrs[lvpt_idx].write(history->localCtrEntry.read());
-              localBiases[lvpt_idx] = history->localBiasEntry;
-          //}
+            panic_if(history->lvptEntry.target.GetTypeID() == 0 &&
+                  history->lvptEntry.target.GetPointerID() != 0,
+                  "LVPT Squash Target's TID is zero!\n");
 
-          delete history;
+            lvpt[lvpt_idx].tag = history->lvptEntry.tag;
+            lvpt[lvpt_idx].tid = history->lvptEntry.tid;
+            lvpt[lvpt_idx].valid = history->lvptEntry.valid;
+            lvpt[lvpt_idx].target = history->lvptEntry.target;
+            localCtrs[lvpt_idx].write(history->localCtrEntry.read());
+            localBiases[lvpt_idx] = history->localBiasEntry;
 
-          DPRINTF(Capability, "[tid:%i]: Removing history for [sn:%i] "
-                 "PC %#x.\n", tid, pred_hist_it->second.seqNum,
-                 pred_hist_it->second.pc);
+            delete history;
 
-          pred_hist.erase(pred_hist_it);
+            DPRINTF(Capability, "[tid:%i]: Removing history for [sn:%i] "
+                  "PC %#x.\n", tid, pred_hist_it->second.seqNum,
+                  pred_hist_it->second.pc);
+
+            pred_hist.erase(pred_hist_it);
 
        }
 
