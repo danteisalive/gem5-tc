@@ -238,7 +238,6 @@ class DefaultIEW
     void squashExecuteAliasTable(DynInstPtr &inst, bool include_inst);
     void updateAliasTable(ThreadID tid, DynInstPtr &inst);
     void IEWUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPtr &inst);
-    bool trackAlias(DynInstPtr inst);
     void zeroIdiomInjectedMicroops(DynInstPtr inst);
     //void checkAccuracy(ThreadID tid, DynInstPtr &inst);
   private:

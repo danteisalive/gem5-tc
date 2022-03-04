@@ -406,9 +406,13 @@ class BaseDynInst : public ExecContext, public RefCounted
 
 
     bool needAliasCacheAccess() const {
+      
+      ThreadContext * tc = cpu->tcBase(threadNumber);
       //return false;
       if (instFlags[AliasFetchStarted]) return false;
-      if (!trackAlias()) return false;
+
+      if (!cpu->fetch.TrackAlias(tc, (Addr)pcState().pc())) return false;
+      
       if (isMicroopInjected()) return false;
       if (isBoundsCheckMicroop()) return false;
 
@@ -420,7 +424,7 @@ class BaseDynInst : public ExecContext, public RefCounted
          staticInst->getName() == "ldis") 
           return true;
       else      
-          return true;
+          return false;
 
    }
 
@@ -461,27 +465,6 @@ class BaseDynInst : public ExecContext, public RefCounted
    }
 
 
-    bool trackAlias() const{
-
-       ThreadContext * tc = cpu->tcBase(threadNumber);
-
-       Block fake;
-       fake.payload = (Addr)pcState().pc();
-       fake.req_szB = 1;
-       UWord foundkey = 1;
-       UWord foundval = 1;
-       unsigned char found = VG_lookupFM(tc->FunctionSymbols,
-                                       &foundkey, &foundval, (UWord)&fake );
-       if (found)
-       {
-         return true;
-       }
-       else
-       {
-         return false;
-       }
-
-   }
     /**
      * Returns true if the DTB address translation is being delayed due to a hw
      * page table walk.
@@ -1104,7 +1087,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   {
         // there is an alias --> go to alias cache
         // check to see if there is a miss or hit for this access
-        if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc))
+        if (!cpu->ExeAliasCache->InitiateAccess(vaddr, seqNum, tc))
         {
             // if this is miss return and wait
             // otherwise continue executing the load
@@ -1137,7 +1120,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   if (cpu->dtb->hasAlias(vaddr, &hasAlias)){  // TLB hit
      if (hasAlias){
        // check to see if there is a miss or hit for this access
-       if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc)){
+       if (!cpu->ExeAliasCache->InitiateAccess(vaddr, seqNum, tc)){
          // if this is miss return and wait
          // otherwise continue executing the load
          instFlags[AliasFetchComplete] = false;
@@ -1158,7 +1141,7 @@ BaseDynInst<Impl>::isAliasCacheMissed(Addr vaddr){
   else { // TLB Miss;
     // we need to check alias for this one
     // due to tlb miss or because valid bit is not set
-    if (!cpu->ExeAliasCache->InitiateAccess(vaddr, tc)){
+    if (!cpu->ExeAliasCache->InitiateAccess(vaddr, seqNum, tc)){
       // TLB miss and alias cache miss TODO: add stat
       instFlags[AliasFetchComplete] = false;
       return true;

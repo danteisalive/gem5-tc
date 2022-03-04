@@ -183,7 +183,7 @@ class LRUAliasCache
 
         bool Access(DynInstPtr& inst, ThreadContext* tc, TheISA::PointerID* pid ) ;
 
-        bool InitiateAccess(Addr vaddr,ThreadContext* tc);
+        bool InitiateAccess(Addr vaddr, uint64_t seqNum, ThreadContext* tc);
 
         bool Commit(Addr vaddr, ThreadContext* tc, TheISA::PointerID& pid);
         bool CommitStore(DynInstPtr& head_inst, ThreadContext* tc);
@@ -197,7 +197,7 @@ class LRUAliasCache
 
         bool Squash(uint64_t seqNum, bool include_inst);
 
-        bool AccessStoreQueue(Addr effAddr, TheISA::PointerID* pid);
+        bool AccessStoreQueue(Addr effAddr, uint64_t seqNum, TheISA::PointerID* pid);
         bool AccessStoreQueue(DynInstPtr& inst, TheISA::PointerID* pid);
         bool SquashEntry(uint64_t squashed_num);
 

@@ -1321,6 +1321,7 @@ template<class Impl>
 bool
 DefaultFetch<Impl>::TrackAlias(ThreadContext * tc, Addr pc_addr) {
 
+    return true;
     Block fake;
     fake.payload = pc_addr;
     fake.req_szB = 1;

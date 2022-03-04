@@ -2039,29 +2039,5 @@ DefaultIEW<Impl>::IEWUpdateAliasTableUsingPointerTracker(ThreadID tid, DynInstPt
 }
 
 
-template <class Impl>
-bool
-DefaultIEW<Impl>::trackAlias(DynInstPtr inst){
-
-    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
-
-    Block fake;
-    fake.payload = (Addr)inst->pcState().pc();
-    fake.req_szB = 1;
-    UWord foundkey = 1;
-    UWord foundval = 1;
-    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
-                                    &foundkey, &foundval, (UWord)&fake );
-    if (found)
-    {
-      return true;
-    }
-    else
-    {
-      return false;
-    }
-
-}
-
 
 #endif//__CPU_O3_IEW_IMPL_IMPL_HH__

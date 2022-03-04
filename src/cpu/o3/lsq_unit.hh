@@ -124,7 +124,7 @@ class LSQUnit {
     //bool lsqWalker();
     //uint64_t lsqGetCachePort(DynInstPtr& inst);
     bool mispredictedPID(ThreadID tid, DynInstPtr &inst);
-    bool trackAlias(DynInstPtr inst);
+
 
     /** Inserts a load instruction. */
     void insertLoad(DynInstPtr &load_inst);

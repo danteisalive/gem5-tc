@@ -591,6 +591,10 @@ PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadCont
     
     if (head_inst->isLoad())
     {
+        // for now just do it for the aliases
+        if (head_inst->staticInst->getName() != "ld" && 
+            head_inst->staticInst->getName() != "ldis") return true;
+
         assert(head_inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
         TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )head_inst->staticInst.get(); 
         assert(inst_regop != nullptr && "inst_regop is null!\n"); 
@@ -1395,24 +1399,34 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
     // this is at commit to make sure everything is right! Don't do anything!
     if (sanity)
     {
+        // We should never have a pointer in a 1/2/4 bytes register
         panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) || CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
                 "Found a 1/2/4 bytes Sub Inst with non-zero PID sources! " 
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
 
-        // this is not acceptable for Sub/SubBig
-        panic_if((dataSize == 8) &&
-                (inst_sub != nullptr || inst_sub_big != nullptr) &&  
-                (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
-                "TransferSubMicroops :: Found a Sub inst with both regs non-zero PID! "
-                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
 
-        // this is not acceptable for SubFlag/SubFlagBig
-        if( (dataSize == 8) &&
-            (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr) &&  
-            (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)) && 
-            (CommitArchRegsPid[src1] != CommitArchRegsPid[src0]))
+
+        // for SubFlag/SubFlagBig the output should always be zero
+        if((dataSize == 8) &&
+            (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr))
         {
+            if (
+                (
+                    CommitArchRegsPid[src1] != TheISA::PointerID(0) && 
+                    CommitArchRegsPid[src0] != TheISA::PointerID(0) && 
+                    CommitArchRegsPid[src1] != CommitArchRegsPid[src0]
+                ) || 
+                (
+                    CommitArchRegsPid[src1] != TheISA::PointerID(0) && 
+                    CommitArchRegsPid[src0] == TheISA::PointerID(0)
+                ) || 
+                (
+                    CommitArchRegsPid[src0] != TheISA::PointerID(0) && 
+                    CommitArchRegsPid[src1] == TheISA::PointerID(0)
+                )
+                )
+            {
                 std::ofstream TyCHEAliasSanityCheckFile;
                 TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
                 TyCHEAliasSanityCheckFile << "---------------------------------------\n";
@@ -1420,17 +1434,31 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
                 TyCHEAliasSanityCheckFile << "Failed to verify TransferSubInst!\n";
                 TyCHEAliasSanityCheckFile << 
                     "TransferSubMicroops :: Found a SubFlag* inst with both regs non-zero PID and not equal!\n" <<
+                    "SeqNum: " << inst->seqNum << " " << 
+                    "PC: " << inst->pcState() << " " << 
+                    "Inst: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << " " << 
                     "SRC1 =" << CommitArchRegsPid[src0] << " " <<
                     "SRC2 = " << CommitArchRegsPid[src1] << "\n";
             
                 // File Close
                 TyCHEAliasSanityCheckFile << "---------------------------------------\n";
                 TyCHEAliasSanityCheckFile.close();
+            }
+
+
         } 
 
 
+        //These are just for normal sub instructions as their result affect other int regs
+        // this is not acceptable for Sub/SubBig
+        panic_if((dataSize == 8) &&
+                (inst_sub != nullptr || inst_sub_big != nullptr) &&  
+                (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
+                "TransferSubMicroops :: Found a Sub inst with both regs non-zero PID! "
+                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
         // dest = src0(PID(0)) - src1(PID(n))
         panic_if((dataSize == 8) && 
+                (inst_sub != nullptr || inst_sub_big != nullptr) && 
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] == TheISA::PointerID(0)), 
                 "TransferSubMicroops :: Found a Sub inst with src1 reg non-zero PID but src0 reg zeo PID! "
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
@@ -1446,8 +1474,8 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
             TheISA::IntRegIndexStr(src1), 
             FetchArchRegsPid[src1]);
 
-     TheISA::PointerID _pid = TheISA::PointerID(0);
-    if (FetchArchRegsPid[src1] != TheISA::PointerID(0) && FetchArchRegsPid[src0] != TheISA::PointerID(0))
+    TheISA::PointerID _pid = TheISA::PointerID(0);
+    if (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr)
     {
         // this is for SubFlag/SubFlagBig microops
         _pid = TheISA::PointerID(0);

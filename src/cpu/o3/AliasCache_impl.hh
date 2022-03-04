@@ -233,7 +233,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     // replacement hapeens after miss is handled
     // if it's a hit, there is no stall and InitiateAccess is complete
     template <class Impl>
-    bool LRUAliasCache<Impl>::InitiateAccess(Addr vaddr, ThreadContext* tc){
+    bool LRUAliasCache<Impl>::InitiateAccess(Addr vaddr, uint64_t seqNum, ThreadContext* tc){
 
         //TODO: stats
         total_accesses = total_accesses + 1;
@@ -242,7 +242,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
 
         // first look into the SQ
         TheISA::PointerID* pid = new TheISA::PointerID(0);
-        bool SQHit = AccessStoreQueue(vaddr, pid);
+        bool SQHit = AccessStoreQueue(vaddr, seqNum, pid);
         if (SQHit){
             total_hits++;
             return true;
@@ -662,7 +662,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     }
 
     template <class Impl>
-    bool LRUAliasCache<Impl>::AccessStoreQueue(Addr effAddr, TheISA::PointerID* pid)
+    bool LRUAliasCache<Impl>::AccessStoreQueue(Addr effAddr, uint64_t seqNum, TheISA::PointerID* pid)
     {
       DumpAliasTableBuffer();
       //first look in Execute Alias store buffer
@@ -671,7 +671,8 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                   exe_alias_buffer != ExeAliasTableBuffer.rend();
                       ++exe_alias_buffer)
       {
-          if (exe_alias_buffer->first->effAddr == effAddr){
+          if (exe_alias_buffer->first->effAddr == effAddr &&
+              exe_alias_buffer->first->seqNum <= seqNum){
             DPRINTF(AliasCache, " AccessStoreQueue::Found an alias in Alias Cache Store Queue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
                   exe_alias_buffer->first->seqNum, 
                   exe_alias_buffer->first->effAddr,
@@ -703,7 +704,8 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
                   exe_alias_buffer != ExeAliasTableBuffer.rend();
                       ++exe_alias_buffer)
       {
-          if (exe_alias_buffer->first->effAddr == effAddr)
+          if (exe_alias_buffer->first->effAddr == effAddr &&
+              exe_alias_buffer->first->seqNum <= inst->seqNum)
           {
             DPRINTF(AliasCache, " AccessStoreQueue::Found an alias in Alias Cache Store Queue:: SeqNum: %d EffAddr: 0x%x PID=%s\n", 
                   exe_alias_buffer->first->seqNum, 

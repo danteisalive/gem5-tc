@@ -1517,7 +1517,7 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    ThreadContext * tc = cpu->tcBase(tid);
    const StaticInstPtr si = inst->staticInst;
 
-   if (!trackAlias(inst)) return false;
+   if (!cpu->fetch.TrackAlias(tc, (Addr)inst->pcState().pc())) return false;
    if (inst->isMicroopInjected()) return false;
    if (inst->isBoundsCheckMicroop()) return false;
 
@@ -1747,28 +1747,5 @@ LSQUnit<Impl>::setBoundsCheckPID(ThreadID tid, DynInstPtr &inst)
 }
 
 
-template <class Impl>
-bool
-LSQUnit<Impl>::trackAlias(DynInstPtr inst){
-
-    ThreadContext * tc = cpu->tcBase(inst->threadNumber);
-
-    Block fake;
-    fake.payload = (Addr)inst->pcState().pc();
-    fake.req_szB = 1;
-    UWord foundkey = 1;
-    UWord foundval = 1;
-    unsigned char found = VG_lookupFM(tc->FunctionSymbols,
-                                    &foundkey, &foundval, (UWord)&fake );
-    if (found)
-    {
-      return true;
-    }
-    else
-    {
-      return false;
-    }
-
-}
 
 #endif//__CPU_O3_LSQ_UNIT_IMPL_HH__
