@@ -408,15 +408,39 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
 
 
     if ((inst->isMallocBaseCollectorMicroop() ||
-        inst->isCallocBaseCollectorMicroop() ||
-        inst->isReallocBaseCollectorMicroop()))
+        inst->isCallocBaseCollectorMicroop()))
     {
-        // what should we do here?
+        assert(inst->dyn_pid != TheISA::PointerID(0) && 
+                "isFreeCallMicroop :: Found a Malloc/Calloc Call Microop with zero PID Return Value!\n");
     }
-    else if ((inst->isFreeCallMicroop() || 
-              inst->isReallocSizeCollectorMicroop()))
+    else if (inst->isMallocSizeCollectorMicroop())
     {
-        // what should we do here?
+        assert(inst->dyn_pid  == TheISA::PointerID(0) &&
+                "isFreeCallMicroop :: Found a Malloc/Calloc Microop with non-zero  PID Parameter!\n");
+    }
+    else if (inst->isCallocSizeCollectorMicroop()) 
+    {
+        
+        assert(inst->dyn_pid  == TheISA::PointerID(0) &&
+                "isFreeCallMicroop :: Found a Malloc/Calloc Microop with non-zero PID Parameter!\n");
+    }
+    else if (inst->isReallocSizeCollectorMicroop())
+    {
+        assert(0);
+    }
+    else if (inst->isReallocBaseCollectorMicroop())
+    {
+        assert(0);
+    }
+    else if (inst->isFreeCallMicroop())
+    {
+        assert(inst->dyn_pid  != TheISA::PointerID(0) && 
+                "isFreeCallMicroop :: Found a Free Call Microop with zero PID Parameter!\n");
+    }
+    else if (inst->isFreeRetMicroop())
+    {
+        assert(inst->dyn_pid  == TheISA::PointerID(0) &&
+                "isFreeRetMicroop :: Found a Free Ret Microop with non-zero PID Parameter!\n");
     }
     else if (inst->staticInst->getName() == "mov")          {TransferMovMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "add")          {TransferAddMicroops(inst, false, true);}
@@ -810,7 +834,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
                                         PointerDepEntry(inst, inst->dyn_pid));
         FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
 
-        DPRINTF(PointerDepGraph, "Malloc/Calloc/Realloc base collector is called! Assigned PID=%s\n", 
+        DPRINTF(PointerDepGraph, "Malloc/Calloc base collector is called! Assigned PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RAX]);
     }
     else if ((track) && inst->isReallocBaseCollectorMicroop())
@@ -823,13 +847,21 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
     }
     else if ((track) && inst->isFreeCallMicroop())
     {
-        assert(inst->dyn_pid == TheISA::PointerID(0) && "Dynamic PID is not zero for FREE CALL!\n");
-        dependGraph[X86ISA::INTREG_RDI].push_front(
-                                        PointerDepEntry(inst, inst->dyn_pid));
-        FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
-        //inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
+        dependGraph[X86ISA::INTREG_RDI].push_front(PointerDepEntry(inst, FetchArchRegsPid[X86ISA::INTREG_RDI]));
+        inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
         // RDI (parameter) and R10 and R11 should be nulled uopn calling free!
         DPRINTF(PointerDepGraph, "Free is called! Invalidating PID=%s\n", 
+                FetchArchRegsPid[X86ISA::INTREG_RDI]);
+
+    }
+    else if ((track) && inst->isFreeRetMicroop())
+    {
+        assert(inst->dyn_pid == TheISA::PointerID(0) && "Dynamic PID is zero for FREE RET!\n");
+        dependGraph[X86ISA::INTREG_RDI].push_front(PointerDepEntry(inst, inst->dyn_pid));
+        // which registers should be set to zero?
+        FetchArchRegsPid[X86ISA::INTREG_RDI] = inst->dyn_pid;
+        // RDI (parameter) and R10 and R11 should be nulled uopn calling free!
+        DPRINTF(PointerDepGraph, "Free is returning! Invalidating PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
 
     }

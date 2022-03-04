@@ -1589,6 +1589,10 @@ DefaultFetch<Impl>::fetch(bool &status_change)
                 }
                 else if (instruction->isFreeCallMicroop())
                 {
+                    // instruction->dyn_pid = TheISA::PointerID(0);
+                }
+                else if (instruction->isFreeRetMicroop())
+                {
                     instruction->dyn_pid = TheISA::PointerID(0);
                 }
 

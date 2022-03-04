@@ -520,6 +520,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
                      AllocatorName == "_ZdaPv") // delete []) 
             {
                 EntryCheckType = TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL;
+                ExitCheckType  = TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_RET;
             }
 
             assert(EntryCheckType != TheISA::TyCHEAllocationPoint::CheckType::AP_INVALID && 
@@ -550,7 +551,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
                 );
                 DPRINTF(TypeMetadata,
                     "PCAddr: %#lx ExitCheckType: %s\n Allocation Point:\n%s\n",
-                    elem.first,
+                    elem.first + 5,
                     TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType),
                     elem.second
                 );
@@ -568,6 +569,19 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
                     "PCAddr: %#lx CheckType: %s\n Allocation Point:\n%s\n",
                     elem.first,
                     TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)EntryCheckType),
+                    elem.second
+                );
+
+                (o3_tc->syms_cache).insert(
+                    std::pair<Addr, TheISA::TyCHEAllocationPoint>
+                    (elem.first + 5, 
+                    TheISA::TyCHEAllocationPoint((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType, 
+                    elem.second))
+                );
+                DPRINTF(TypeMetadata,
+                    "PCAddr: %#lx ExitCheckType: %s\n Allocation Point:\n%s\n",
+                    elem.first + 5,
+                    TheISA::TyCHEAllocationPoint::CheckTypeToStr((TheISA::TyCHEAllocationPoint::CheckType)ExitCheckType),
                     elem.second
                 );
             }

@@ -1592,13 +1592,26 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     }
     else if (inst->isFreeCallMicroop()){
 
-        uint64_t _pid_base = inst->readDestReg(inst->staticInst.get(),0);
+        tc->free_base   = inst->readDestReg(inst->staticInst.get(),0);
+        tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::FREE_CALL;
+
+        DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
+                    "FREE CALL=0x%x SEQNUM=%d PCADDR=0x%x\n",
+                    tc->free_base, inst->seqNum, inst->pcState().instAddr());
+      
+
+    }
+    else if (inst->isFreeRetMicroop())
+    {
+
+        if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::FREE_CALL)
+            panic("AP_FREE_RET: Invalid Status!");
 
         //check whether we have the cap for this AP or not
         TheISA::PointerID _pid = TheISA::PointerID(0);
         Block* bk = NULL;
         Block fake;
-        fake.payload = _pid_base;
+        fake.payload = tc->free_base;
         fake.req_szB = 1;
         UWord oldKeyW;
         unsigned char found = VG_delFromFM( tc->interval_tree,
@@ -1609,7 +1622,9 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             assert(bk->pid != 0);
             _pid = TheISA::PointerID(bk->pid);
             free(bk);
+            assert(tc->num_of_allocations >= 1 && "tc->num_of_allocations < 1");
             tc->num_of_allocations--;
+            
         }
 
         if (_pid != TheISA::PointerID(0))
@@ -1617,15 +1632,13 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             cpu->ExeAliasCache->Invalidate(tc, _pid);
 
             DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
-                    "FREE CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
-                    _pid_base, _pid, inst->seqNum, inst->pcState().instAddr());
+                    "FREE RET=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                    tc->free_base, _pid, inst->seqNum, inst->pcState().instAddr());
         }
 
-    }
-    else if (inst->isFreeRetMicroop()){
+        DPRINTF(Allocator, "DefaultCommit<Impl>::collector::FREE RET\n");
+        tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
 
-      DPRINTF(Allocator, "DefaultCommit<Impl>::collector::FREE RET CALL\n");
-      
     }
     else if (inst->isCallocSizeCollectorMicroop()){
 

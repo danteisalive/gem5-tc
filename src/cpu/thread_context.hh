@@ -139,6 +139,7 @@ class ThreadContext
     uint64_t num_of_allocations;
     uint64_t ap_pid;
     uint64_t ap_size;
+    uint64_t free_base;
 
     SymbolCache                                 syms_cache;
     TheISA::PointerID                           PID = TheISA::PointerID(0);
