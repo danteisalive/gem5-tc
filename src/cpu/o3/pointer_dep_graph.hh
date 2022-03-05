@@ -150,6 +150,7 @@ class PointerDependencyGraph
     //std::ofstream TyCHEAliasSanityCheckFile;
 
     void TransferMovMicroops(DynInstPtr &inst, bool track, bool sanity);
+    void TransferLeaMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferStoreMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferStoreInStackMicroops(DynInstPtr &inst, bool track, bool sanity);
     void TransferStoreUnsignedLongMicroops(DynInstPtr &inst, bool track, bool sanity);

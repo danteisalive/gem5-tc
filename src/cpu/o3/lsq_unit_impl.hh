@@ -834,8 +834,9 @@ LSQUnit<Impl>::executeStore(DynInstPtr &store_inst, ThreadID tid)
 
     panic_if(!store_inst->effAddrValid(), "store effAddr is not valid!");
 
-
-    LSQUpdateAliasTableUsingPointerTracker(tid, store_inst);
+    ThreadContext * tc = cpu->tcBase(tid);
+    if (tc->enableCapability) 
+        LSQUpdateAliasTableUsingPointerTracker(tid, store_inst);
     
     return checkViolations(load_idx, store_inst);
 

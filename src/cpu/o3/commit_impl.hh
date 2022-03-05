@@ -1629,7 +1629,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
         if (_pid != TheISA::PointerID(0))
         {
-            cpu->ExeAliasCache->Invalidate(tc, _pid);
+            // cpu->ExeAliasCache->Invalidate(tc, _pid);
 
             DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                     "FREE RET=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
@@ -1728,7 +1728,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
 
       if (_pid != TheISA::PointerID(0))
       {
-        cpu->ExeAliasCache->Invalidate(tc, _pid);
+        // cpu->ExeAliasCache->Invalidate(tc, _pid);
 
         DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
                 "REALLOC CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",

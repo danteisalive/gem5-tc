@@ -443,6 +443,7 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
                 "isFreeRetMicroop :: Found a Free Ret Microop with non-zero PID Parameter!\n");
     }
     else if (inst->staticInst->getName() == "mov")          {TransferMovMicroops(inst, false, true);}
+    else if (inst->staticInst->getName() == "lea")          {TransferLeaMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "add")          {TransferAddMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "sub")          {TransferSubMicroops(inst, false, true);}
     else if (inst->staticInst->getName() == "addi")         {TransferAddImmMicroops(inst, false, true);}
@@ -866,6 +867,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
 
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
+    else if (inst->staticInst->getName() == "lea")  {TransferLeaMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "st")   {TransferStoreMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "stis") {TransferStoreInStackMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "ld")   {TransferLoadMicroops(inst, track, false);}
@@ -918,6 +920,63 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
             track ? "Tracking" : "Updating");
     dump();
 
+
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::TransferLeaMicroops(DynInstPtr &inst, bool track, bool sanity)
+{
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4);
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); //index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+
+
+    
+    X86ISAInst::Lea * inst_lea = dynamic_cast<X86ISAInst::Lea*>(inst->staticInst.get()); 
+    assert((inst_lea != nullptr) && "Found a 8 bytes lea inst that is not X86ISA::Lea!\n");
+
+
+    // this is at commit to make sure everything is right! Don't do anything!
+    if (sanity)
+    {
+        panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                        "TransferLoadeMicroops :: Found a 8 Lea Microop with non-zero PID Index!\n");
+        return;
+    }    
+
+    TheISA::PointerID _pid = TheISA::PointerID(0);
+
+    if (dataSize == 8)
+    {
+        _pid = FetchArchRegsPid[src1];
+    }
+
+    FetchArchRegsPid[dest] = _pid;
+    inst->dyn_pid = _pid;
+
+    if (track)
+    {
+        dependGraph[dest].push_front(PointerDepEntry(inst, _pid));
+    }
+            
+
+    DPRINTF(PointerDepGraph, "\t\tFetchArchRegsPid[%s]=FetchArchRegsPid[BASE(%s) + INDEX(%s)]=[%d]\n", 
+                    TheISA::IntRegIndexStr(dest),
+                    TheISA::IntRegIndexStr(src1),
+                    TheISA::IntRegIndexStr(src0), 
+                    FetchArchRegsPid[dest].GetPointerID());
+
+    
 
 }
 

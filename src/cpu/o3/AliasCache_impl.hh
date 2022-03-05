@@ -481,7 +481,7 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
     }
     template <class Impl>
     bool LRUAliasCache<Impl>::Invalidate( ThreadContext* tc, TheISA::PointerID& pid){
-
+      // bug line : 135558
       // loop through the cache and invalid all freed entrys
       for (size_t setNum = 0; setNum < NumSets; setNum++) {
         for (size_t wayNum = 0; wayNum < NumWays; wayNum++) {
@@ -530,8 +530,8 @@ LRUAliasCache<Impl>::LRUAliasCache(uint64_t _num_ways,
               }
         }
 
-        // delete all aliases that match this pid from exe alias table store
-        // buffer
+        // nulify all aliases that match this pid from exe alias table store
+        // buffer and thier seqNum is higher than the AP_FREE_RET microop
         // commit alias table will be updates in its own collector
         // this removal shoidl happen when returnin from Free function
         // but as we dont know the pid at the return and we are not tracking
