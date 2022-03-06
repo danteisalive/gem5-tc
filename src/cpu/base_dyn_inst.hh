@@ -147,6 +147,7 @@ class BaseDynInst : public ExecContext, public RefCounted
         AliasFetchStarted,
         AliasFetchComplete,
         IsAliasInTransition,
+        IsTypeTracked,
         MaxFlags
     };
 
@@ -676,7 +677,7 @@ class BaseDynInst : public ExecContext, public RefCounted
     bool isFirstMicroop() const { return staticInst->isFirstMicroop(); }
     bool isMicroBranch() const { return staticInst->isMicroBranch(); }
 
-    bool isNotTrackMicroop() const {return staticInst->isNotTrackMicroop();}
+    //bool isNotTrackMicroop() const {return staticInst->isNotTrackMicroop();}
     bool isMicroopInjected() const {return staticInst->isMicroopInjected();}
 
     bool isMallocBaseCollectorMicroop() const
@@ -703,6 +704,12 @@ class BaseDynInst : public ExecContext, public RefCounted
     {return staticInst->isBoundsCheckNeeded();}
 
     bool isAliasInTransition() const {return instFlags[IsAliasInTransition];}
+    bool isTypeTracked() const {return instFlags[IsTypeTracked];}
+    void setTypeTracked(bool state) 
+    { 
+        instFlags[IsTypeTracked] = state;
+        staticInst->setTypeTracked(state);
+    }
     uint64_t getAliasStoreSeqNum() const 
     {
         assert(instFlags[IsAliasInTransition] && "getAliasStoreSeqNum called when it's not in transition!\n");

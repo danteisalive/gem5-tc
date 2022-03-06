@@ -81,23 +81,16 @@ class PointerDependencyEntry
 template <class Impl>
 class PointerDependencyGraph
 {
+  private:
+    // ThreadContext::COLLECTOR_STATUS typeTrackerStatus;
+    bool isTypeTrackerEnabled;
+
   public:
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef PointerDependencyEntry<Impl> PointerDepEntry;
 
     /** Default construction.  Must call resize() prior to use. */
-    PointerDependencyGraph()
-        : numEntries(0), memAllocCounter(0), nodesTraversed(0), nodesRemoved(0)
-    {
-        for (int i = 0; i < TheISA::NumIntRegs; ++i) {
-            dependGraph[i].clear();
-            FetchArchRegsPid[i] = TheISA::PointerID(0);
-            CommitArchRegsPid[i] = TheISA::PointerID(0);
-        }
-        std::ofstream TyCHEAliasSanityCheckFile;
-        TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::fstream::out);
-        TyCHEAliasSanityCheckFile.close();
-    }
+    PointerDependencyGraph();
 
     ~PointerDependencyGraph();
 
@@ -111,7 +104,7 @@ class PointerDependencyGraph
     void insert(DynInstPtr &new_inst);
 
 
-    void doSquash(uint64_t squashedSeqNum);
+    void doSquash(const DynInstPtr squashedInst, uint64_t squashedSeqNum);
 
     void doUpdate(DynInstPtr& inst);
     void InternalUpdate(DynInstPtr &inst, bool track);
@@ -120,6 +113,7 @@ class PointerDependencyGraph
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr &inst);
     void updatePIDWithTypeTracker(DynInstPtr &inst);
+    bool updateTypeTrackerState();
     /** Debugging function to dump out the dependency graph.
      */
     void dump(DynInstPtr &inst);

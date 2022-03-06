@@ -134,6 +134,6 @@ class StaticInstFlags(Enum):
         #Does this microop need to get checked for bounds
         'IsFreeCallMicroop',   #Is this an injected microop to free an AP
         'IsFreeRetMicroop',   #Is this an injected microop to free an AP
-        'IsNotTrackMicroop'
+        'IsTypeTracked'
         # Is this a micropop that should not be tracked
         ]

@@ -570,6 +570,8 @@ class FullO3CPU : public BaseO3CPU
      */
     ListIt addInst(DynInstPtr &inst);
 
+    uint64_t getNumOfInsts() const { return instList.size();}
+
     /** Function to tell the CPU that an instruction has completed. */
     void instDone(ThreadID tid, DynInstPtr &inst);
 

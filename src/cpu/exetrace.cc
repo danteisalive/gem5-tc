@@ -156,6 +156,9 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
         outs << "PID(UNK)";
     }
 
+
+    outs << (inst->isTypeTracked() ? " [T]" :" [NT]");
+
     outs << endl;
 }
 
@@ -258,6 +261,8 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran, std::ostr
     {
         outs << "PID(UNK)";
     }
+
+    outs << (inst->isTypeTracked() ? " [T]" :" [NT]");
 
     outs << endl;
 }

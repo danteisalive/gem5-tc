@@ -50,8 +50,29 @@
 
 
 template <class Impl>
+PointerDependencyGraph<Impl>::PointerDependencyGraph()
+        : numEntries(0), memAllocCounter(0), nodesTraversed(0), nodesRemoved(0)
+{
+        for (int i = 0; i < TheISA::NumIntRegs; ++i) {
+            dependGraph[i].clear();
+            FetchArchRegsPid[i] = TheISA::PointerID(0);
+            CommitArchRegsPid[i] = TheISA::PointerID(0);
+        }
+        std::ofstream TyCHEAliasSanityCheckFile;
+        TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::fstream::out);
+        TyCHEAliasSanityCheckFile.close();
+
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+        isTypeTrackerEnabled = true;
+}
+
+template <class Impl>
 PointerDependencyGraph<Impl>::~PointerDependencyGraph()
-{}
+{
+
+
+
+}
 
 
 template <class Impl>
@@ -64,6 +85,9 @@ PointerDependencyGraph<Impl>::reset()
         FetchArchRegsPid[i] = TheISA::PointerID(0);
         CommitArchRegsPid[i] = TheISA::PointerID(0);
     }
+
+    // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+    isTypeTrackerEnabled = true;
 }
 
 template <class Impl>
@@ -75,21 +99,46 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
+PointerDependencyGraph<Impl>::doSquash(const DynInstPtr squashedInst, uint64_t squashedSeqNum){
 
 
     DPRINTF(PointerDepGraph, "Squashing Alias Until Sequence Number: [%d]\n", squashedSeqNum);
+    if (squashedInst)
+        DPRINTF(PointerDepGraph, "[%d][%s][%s][Inst. PID: %s][AIT: %s][%d][%s]\n", 
+                                squashedInst->seqNum,
+                                squashedInst->pcState(), 
+                                squashedInst->staticInst->disassemble(squashedInst->pcState().instAddr()),
+                                squashedInst->dyn_pid,
+                                (squashedInst->isAliasInTransition() ? "Yes" : "No"),
+                                (squashedInst->isAliasInTransition() ? squashedInst->getAliasStoreSeqNum() : 0),
+                                (squashedInst->isTypeTracked() ? "T" : "NT")
+                                );
     DPRINTF(PointerDepGraph, "Dependency Graph Before Squashing:\n");
     dump();
 
+
+
+
     // if the producer seqNum is greater than squashedSeqNum then
     // remove it and all of the consumers as they are all will be squashed
+    uint64_t    firstInstSeqNum = UINT64_MAX;
+    bool        firstInstState  = false;
+    bool        isAPMicroop     = false;
     for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
 
         // Erase all even numbers (C++11 and later)
         for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); )
         {
             if (it->inst->seqNum > squashedSeqNum) {
+                // book keeping
+                if (it->inst->seqNum < firstInstSeqNum) 
+                {
+                    firstInstSeqNum =  it->inst->seqNum;
+                    firstInstState  =  it->inst->isTypeTracked();
+                    // all of the APs are injected. bounds check are not in dep graph
+                    isAPMicroop     =  it->inst->isMicroopInjected(); 
+                } 
+            
                 it->inst = NULL;
                 it = dependGraph[i].erase(it);
             } else {
@@ -98,6 +147,17 @@ PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
         }
 
     } // for loop
+
+    // if the depGraph is empty, then we need to fall back to another method for determining type tracker state
+    if (!updateTypeTrackerState())
+    {
+        assert((firstInstSeqNum != UINT64_MAX) && 
+            "Unexptected state when squashing! This means there was no inst to squash and depGraph is also empty!\n");
+        assert(!isAPMicroop && "What should we do about this?!\n");
+        
+        isTypeTrackerEnabled = firstInstState;
+    }
+    
 
     // now for each int reg update the FetchArchRegsPid with the front inst
     // if there is no inst in the queue then update it with the
@@ -113,6 +173,74 @@ PointerDependencyGraph<Impl>::doSquash(uint64_t squashedSeqNum){
 
     DPRINTF(PointerDepGraph, "Dependency Graph After Squashing:\n");
     dump();
+}
+
+
+// return false if the depGraph is empty
+template <class Impl>
+bool
+PointerDependencyGraph<Impl>::updateTypeTrackerState()
+{
+    // in order to put type tracker in a consistent state, we go through all the in transit insts 
+    // and find the latest state
+    // depending on the last instruction, 
+    // if we are on the borders, malloc/calloc/free size and base then they determine next state
+    // else just look at the IsTypeTracker flag
+
+
+    uint64_t lastSeqNum = 0;
+    bool found = false;
+    for (size_t i = 0; i < TheISA::NumIntRegs; i++) {
+
+        // Erase all even numbers (C++11 and later)
+        for (auto it = dependGraph[i].cbegin(); it != dependGraph[i].cend(); ++it)
+        {
+            if (it->inst->seqNum > lastSeqNum) 
+            {
+                lastSeqNum = it->inst->seqNum;
+                found = true;
+                if (it->inst->isMallocSizeCollectorMicroop())
+                {
+                    // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+                    isTypeTrackerEnabled = false;
+                } 
+                else if (it->inst->isCallocSizeCollectorMicroop())
+                {
+                    // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+                    isTypeTrackerEnabled = false;
+                }
+                else if (it->inst->isReallocSizeCollectorMicroop())
+                {   
+                    assert(0);
+                } 
+                else if (it->inst->isFreeCallMicroop())
+                {
+                    // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::FREE_CALL;
+                    isTypeTrackerEnabled = false;
+                } 
+                else if (it->inst->isMallocBaseCollectorMicroop() || 
+                        it->inst->isCallocBaseCollectorMicroop() || 
+                        it->inst->isReallocBaseCollectorMicroop() ||
+                        it->inst->isFreeRetMicroop())
+                {
+                    // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+                    isTypeTrackerEnabled = true;
+                }
+                else 
+                {
+                    // just check the status of the last inst
+                    isTypeTrackerEnabled = it->inst->isTypeTracked();
+                }
+            } 
+        }
+
+    } // for loop
+    
+    assert(((found && lastSeqNum != 0) || (!found && lastSeqNum == 0)) && "Not a viable state!\n");
+
+    // if the depGraph is emoty, fall back to another method to determine type tracker state
+    return (lastSeqNum != 0) ? true : false;
+
 }
 
 template <class Impl>
@@ -411,18 +539,18 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
         inst->isCallocBaseCollectorMicroop()))
     {
         assert(inst->dyn_pid != TheISA::PointerID(0) && 
-                "isFreeCallMicroop :: Found a Malloc/Calloc Call Microop with zero PID Return Value!\n");
+                "isM/CallocBaseCollectorMicroop :: Found a Malloc/Calloc Call Microop with zero PID Return Value!\n");
     }
     else if (inst->isMallocSizeCollectorMicroop())
     {
         assert(inst->dyn_pid  == TheISA::PointerID(0) &&
-                "isFreeCallMicroop :: Found a Malloc/Calloc Microop with non-zero  PID Parameter!\n");
+                "isMallocSizeCollectorMicroop :: Found a Malloc/Calloc Microop with non-zero  PID Parameter!\n");
     }
     else if (inst->isCallocSizeCollectorMicroop()) 
     {
         
         assert(inst->dyn_pid  == TheISA::PointerID(0) &&
-                "isFreeCallMicroop :: Found a Malloc/Calloc Microop with non-zero PID Parameter!\n");
+                "isCallocSizeCollectorMicroop :: Found a Malloc/Calloc Microop with non-zero PID Parameter!\n");
     }
     else if (inst->isReallocSizeCollectorMicroop())
     {
@@ -581,7 +709,7 @@ PointerDependencyGraph<Impl>::dump()
         for (auto it = dependGraph[i].begin(); it != dependGraph[i].end(); it++)
         {
           assert(it->inst); // shouldnt be a null inst
-          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s][Inst: %s][Dep: %s][AIT: %s][%d]\n", 
+          DPRINTF(PointerDepGraph, "[%s] ==> [%d][%s][%s][Inst: %s][Dep: %s][AIT: %s][%d][%s]\n", 
                                 TheISA::IntRegIndexStr(i),
                                 it->inst->seqNum,
                                 it->inst->pcState(), 
@@ -589,7 +717,8 @@ PointerDependencyGraph<Impl>::dump()
                                 it->inst->dyn_pid,
                                 it->pid, 
                                 (it->inst->isAliasInTransition() ? "Yes" : "No"),
-                                (it->inst->isAliasInTransition() ? it->inst->getAliasStoreSeqNum() : 0)
+                                (it->inst->isAliasInTransition() ? it->inst->getAliasStoreSeqNum() : 0),
+                                (it->inst->isTypeTracked() ? "T" : "NT")
                                 );
      
         }
@@ -665,7 +794,9 @@ PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadCont
                 // File Close
                 TyCHEAliasSanityCheckFile << "---------------------------------------\n";
                 TyCHEAliasSanityCheckFile.close();
-                assert((_pid == head_inst->dyn_pid) &&
+                // this is only true when we are actualy outside of the APs
+                if (head_inst->isTypeTracked())
+                    assert((_pid == head_inst->dyn_pid) &&
                         "Failed to verify that alias and dynamic pid are the same!\n");
             }
 
@@ -815,6 +946,14 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
 
     if (inst->isBoundsCheckMicroop()) return;
 
+    // the type tracker is disabled during APs because Ap's are assumed to be safe and 
+    // we cannot track anything inside them as they do many OOB accesses
+    if (track) 
+    {
+        inst->setTypeTracked(isTypeTrackerEnabled);
+    }
+
+
     DPRINTF(PointerDepGraph, "%s Alias for Instruction: [%d][%s][%s]\n", 
             track ? "Tracking" : "Updating",
             inst->seqNum,
@@ -835,8 +974,34 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
                                         PointerDepEntry(inst, inst->dyn_pid));
         FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
 
-        DPRINTF(PointerDepGraph, "Malloc/Calloc base collector is called! Assigned PID=%s\n", 
+        DPRINTF(PointerDepGraph, " Enabling Type Tracker! Malloc/Calloc base collector is called! Assigned PID=%s!\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RAX]);
+        
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+        isTypeTrackerEnabled = true;
+    }
+    else if (track && inst->isMallocSizeCollectorMicroop())
+    {
+
+        dependGraph[X86ISA::INTREG_RDI].push_front(
+                                        PointerDepEntry(inst, TheISA::PointerID(0)));
+        FetchArchRegsPid[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
+        inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+        isTypeTrackerEnabled = false;
+
+        DPRINTF(PointerDepGraph, "Malloc/Calloc size collector is called! Disabling the type tracker!\n");
+    }
+    else if (track && inst->isCallocSizeCollectorMicroop())
+    {
+        dependGraph[X86ISA::INTREG_RDI].push_front(
+                                        PointerDepEntry(inst, TheISA::PointerID(0)));
+        FetchArchRegsPid[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
+        inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+        isTypeTrackerEnabled = false;
+
+        DPRINTF(PointerDepGraph, "Malloc/Calloc size collector is called! Disabling the type tracker!\n");
     }
     else if ((track) && inst->isReallocBaseCollectorMicroop())
     {
@@ -851,8 +1016,11 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
         dependGraph[X86ISA::INTREG_RDI].push_front(PointerDepEntry(inst, FetchArchRegsPid[X86ISA::INTREG_RDI]));
         inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
         // RDI (parameter) and R10 and R11 should be nulled uopn calling free!
-        DPRINTF(PointerDepGraph, "Free is called! Invalidating PID=%s\n", 
+        DPRINTF(PointerDepGraph, "Disabling Type Tracker! Free is called! Invalidating PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
+
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+        isTypeTrackerEnabled = false;
 
     }
     else if ((track) && inst->isFreeRetMicroop())
@@ -865,6 +1033,8 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
         DPRINTF(PointerDepGraph, "Free is returning! Invalidating PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
 
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+        isTypeTrackerEnabled = true;
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "lea")  {TransferLeaMicroops(inst, track, false);}
@@ -1872,10 +2042,10 @@ PointerDependencyGraph<Impl>::TransferAndMicroops(DynInstPtr &inst, bool track, 
     // this is at commit to make sure everything is right! Don't do anything!
     if (sanity)
     {
-        panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
-                (CommitArchRegsPid[src1] != TheISA::PointerID(0) || CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
-                "Found a 1/2/4 bytes And Inst with non-zero PID sources! " 
-                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+        // panic_if((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
+        //         (CommitArchRegsPid[src1] != TheISA::PointerID(0) || CommitArchRegsPid[src0] != TheISA::PointerID(0)), 
+        //         "Found a 1/2/4 bytes And Inst with non-zero PID sources! " 
+        //         "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
 
         panic_if((dataSize == 8) && 
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && CommitArchRegsPid[src0] != TheISA::PointerID(0)) &&
@@ -1894,8 +2064,12 @@ PointerDependencyGraph<Impl>::TransferAndMicroops(DynInstPtr &inst, bool track, 
             TheISA::IntRegIndexStr(src1), 
             FetchArchRegsPid[src1]);
 
-    
-    TheISA::PointerID _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
+    TheISA::PointerID _pid = TheISA::PointerID(0);
+    // And/AndBig result can be a pointer. AndFlag and AndFlagBig is always not a pointer
+    if (inst_and != nullptr || inst_and_big != nullptr)
+    {
+        _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
+    }
 
     FetchArchRegsPid[dest] = _pid;
 

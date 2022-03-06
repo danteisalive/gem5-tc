@@ -102,6 +102,7 @@ BaseDynInst<Impl>::initVars()
     aliasFetchStartCycle = 0;
     aliasStoreSeqNum = 0;
     instFlags[IsAliasInTransition] = false;
+    instFlags[IsTypeTracked] = true;
     instFlags[AliasFetchComplete] = false;
     instFlags[AliasFetchStarted] = false;
     MissPIDSquashType = MisspredictionType::NONE;

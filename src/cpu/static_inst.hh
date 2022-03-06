@@ -190,7 +190,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
     bool isLastMicroop() const { return flags[IsLastMicroop]; }
     bool isFirstMicroop() const { return flags[IsFirstMicroop]; }
 
-    bool isNotTrackMicroop() const {return flags[IsNotTrackMicroop];}
+    void setTypeTracked(bool state) {flags[IsTypeTracked] = state;}
+    bool isTypeTracked() const {return flags[IsTypeTracked];}
     bool isMicroopInjected() const {return flags[IsMicroopInjected];}
     bool isMallocBaseCollectorMicroop() const
     {return flags[IsMallocBaseCollectorMicroop];}
@@ -319,6 +320,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
       PredictionConfidenceLevel = -1;
       PredictionPointerRefillConfidence = -1;
       isSquashedAfterInjection = false;
+      flags[IsTypeTracked] = true;
     }
 
   public:
