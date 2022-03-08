@@ -709,6 +709,8 @@ class BaseDynInst : public ExecContext, public RefCounted
     { 
         instFlags[IsTypeTracked] = state;
         staticInst->setTypeTracked(state);
+        if (macroop) macroop->setTypeTracked(state);
+
     }
     uint64_t getAliasStoreSeqNum() const 
     {
