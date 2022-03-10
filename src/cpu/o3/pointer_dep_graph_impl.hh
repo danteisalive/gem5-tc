@@ -101,7 +101,7 @@ template <class Impl>
 void
 PointerDependencyGraph<Impl>::doSquash(const DynInstPtr squashedInst, uint64_t squashedSeqNum){
 
-
+   
     DPRINTF(PointerDepGraph, "Squashing Alias Until Sequence Number: [%d]\n", squashedSeqNum);
     if (squashedInst)
         DPRINTF(PointerDepGraph, "[%d][%s][%s][Inst. PID: %s][AIT: %s][%d][%s]\n", 

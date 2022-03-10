@@ -892,7 +892,11 @@ DefaultFetch<Impl>::squashFromDecode(const TheISA::PCState &newPC,
 {
     DPRINTF(Fetch, "[tid:%i]: Squashing from decode.\n", tid);
     panic("squashFromDecode is called!");
-    if (cpu->getNumOfInsts()) cpu->PointerDepGraph.doSquash(squashInst, seq_num);
+    ThreadContext * tc = cpu->tcBase(tid);
+    if (tc->enableCapability && cpu->getNumOfInsts()) 
+    {
+        cpu->PointerDepGraph.doSquash(squashInst, seq_num);
+    }
     doSquash(newPC, squashInst, tid, false);
 
     // Tell the CPU to remove any instructions that are in flight between
@@ -964,8 +968,11 @@ DefaultFetch<Impl>::squash(const TheISA::PCState &newPC,
                            MisspredictionType _MissPIDSquashType)
 {
     DPRINTF(Fetch, "[tid:%u]: Squash from commit.\n", tid);
-
-    if (cpu->getNumOfInsts()) cpu->PointerDepGraph.doSquash(squashInst, seq_num);
+    ThreadContext * tc = cpu->tcBase(tid);
+    if (tc->enableCapability && cpu->getNumOfInsts()) 
+    {
+        cpu->PointerDepGraph.doSquash(squashInst, seq_num);
+    }
     doSquash(newPC, squashInst, tid, squashDueToMispredictedPID);
     // Tell the CPU to remove any instructions that are not in the ROB.
     cpu->removeInstsNotInROB(tid, _MissPIDSquashType);
