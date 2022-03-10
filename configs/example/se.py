@@ -124,7 +124,7 @@ Options.addSEOptions(parser)
 
 
 parser.add_option("--enable-capability", default=False,action ="store_true",help="""Enable capability mode.""")
-parser.add_option("--symbol-file",default="",help="""The symbol file to initiliaze symbole cache.""")
+parser.add_option("--symbol-file",default="",help="""The symbol file to initiliaze type cache.""")
 parser.add_option("--elf-file",default="",help="""""")
 if '--ruby' in sys.argv:
     Ruby.define_options(parser)
