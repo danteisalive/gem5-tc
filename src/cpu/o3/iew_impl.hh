@@ -1449,7 +1449,7 @@ DefaultIEW<Impl>::executeInsts()
                   inst->isBoundsCheckMicroop() &&
                   fault == NoFault)
                 {
-                    cpu->PointerDepGraph.updatePIDWithTypeTracker(inst);
+                    cpu->PointerDepGraph.updatePIDWithTypeTracker(inst, tc);
                     if (!inst->isCapabilityChecked())
                     {
                         DPRINTF(IEW, "Execute: Delayed capability check, "

@@ -1330,11 +1330,17 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         
     if (tc->enableCapability){
 
-      if (head_inst->isStore()){
-        CommitUpdateAliasTableInCommit(tid, head_inst);
-      }
+        if (head_inst->isStore())
+        {
+            CommitUpdateAliasTableInCommit(tid, head_inst);
+        }
+        else if (head_inst->staticInst->getName() == "add" || 
+                 head_inst->staticInst->getName() == "lea")
+        {
+            cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst, tc);
+        }
 
-      cpu->ExeAliasCache->RemoveStackAliases(cpu->readArchIntReg(X86ISA::INTREG_RSP,tid), tc);
+        cpu->ExeAliasCache->RemoveStackAliases(cpu->readArchIntReg(X86ISA::INTREG_RSP,tid), tc);
 
     }
 
@@ -1797,7 +1803,7 @@ DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &he
 
   DPRINTF(TypeTracker, "CommitUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", head_inst->seqNum, head_inst->effAddr, head_inst->dyn_pid, dataRegContent);
   // first call updatePIDWithTypeTracker to make sure we have the latest PID from type tracker
-  cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst);
+  cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst, tc);
   // update all the entrys in the AliasCache to make sure we are in sync
   //cpu->ExeAliasCache->UpdateEntry(head_inst, tc);
   // then update the ExecStore in alias cache before updating it

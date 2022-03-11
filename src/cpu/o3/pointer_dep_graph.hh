@@ -112,7 +112,12 @@ class PointerDependencyGraph
     void updatePointerRefillLoad(DynInstPtr &inst, TheISA::PointerID pid);
     /** Removes an instruction from a single linked list. */
     void doCommit(DynInstPtr &inst);
-    void updatePIDWithTypeTracker(DynInstPtr &inst);
+    void updatePIDWithTypeTracker(DynInstPtr &inst, ThreadContext* tc);
+    void doUpdateForNoneLoadMicroops(DynInstPtr& inst);
+    void updatePointerTrackerForStoreMicroop(DynInstPtr &inst);
+    void updatePointerTrackerForAddMicroop(DynInstPtr &inst, ThreadContext* tc);
+    void updatePointerTrackerForLeaMicroop(DynInstPtr &inst, ThreadContext* tc);
+    void updateBoundsCheckMicroop(DynInstPtr &inst);
     bool updateTypeTrackerState();
     /** Debugging function to dump out the dependency graph.
      */

@@ -352,108 +352,16 @@ PointerDependencyGraph<Impl>::syncPointerRefills(DynInstPtr &inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst, ThreadContext* tc)
 {
-    if (inst->isStore())
-    {
-        assert((inst->staticInst->getName() == "st" || inst->staticInst->getName() == "stis") && 
-                "updatePIDWithTypeTracker is called fro a store that is not st/stis\n");
-        assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
-        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
-        const uint8_t dataSize = inst_regop->dataSize;
-        assert(dataSize == 8 && "dataSize is not equal to 8!\n");
-
-        X86ISAInst::St * inst_st = dynamic_cast<X86ISAInst::St*>(inst->staticInst.get()); 
-        X86ISAInst::Stis * inst_stis = dynamic_cast<X86ISAInst::Stis*>(inst->staticInst.get()); 
-        assert((inst_st != nullptr || inst_stis != nullptr) && "Found a st inst that is not X86ISA::St or X86ISA::Stis!\n");
-    
-
-
-        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
-
-        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
-        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;//base
-        uint16_t src2 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //data
-        
-        DPRINTF(PointerDepGraph, "Store Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
-                inst->seqNum,
-                inst->pcState(), 
-                inst->staticInst->disassemble(inst->pcState().instAddr()),
-                inst->dyn_pid,
-                inst->staticInst->getStaticPointerID());
-
-        inst->dyn_pid = CommitArchRegsPid[src2];
-        inst->staticInst->setStaticPointerID(CommitArchRegsPid[src2]);
-
-        DPRINTF(PointerDepGraph, "Updated PID for Store Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
-                inst->seqNum,
-                inst->pcState(), 
-                inst->staticInst->disassemble(inst->pcState().instAddr()),
-                inst->dyn_pid,
-                inst->staticInst->getStaticPointerID());
-
-        // now go through all the pointer refills that use this pointer spill and make sure they are in sync!
-        syncPointerRefills(inst);
-
-        return;
-    }
-    else if (inst->isBoundsCheckMicroop())
-    {
-        assert(inst->isLoad() && "A non-load bounds chec k microop!\n");
-        assert(inst->staticInst->getName() == "ld" && "A non-ld bounds check!\n");
-        assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
-        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
-        const uint8_t dataSize = inst_regop->dataSize;
-        assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
-
-        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
-
-        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
-        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
-        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); dest = dest;//dest
-
-        DPRINTF(PointerDepGraph, "Updating PID for Bounds Check Instruction: [%d][%s][%s][%s]\n", 
-                inst->seqNum,
-                inst->pcState(), 
-                inst->staticInst->disassemble(inst->pcState().instAddr()),
-                inst->dyn_pid);
-        DPRINTF(PointerDepGraph, "Selected Dependency Graph:\n");
-        dump();
-
-        // if (dependGraph[src1].empty()) {
-        //     DPRINTF(PointerDepGraph, "Dependency Graph is Empty for this Base: %s\n", TheISA::IntRegIndexStr(src1));
-        //     return;
-        // }
-        //if (inst->seqNum > dependGraph[src1].back().inst->seqNum) return inst->dyn_pid;
-        //look at the latest value of PID for base register
-        TheISA::PointerID res = inst->dyn_pid;
-        bool found = false;
-        for (auto it = dependGraph[src1].cbegin(); it != dependGraph[src1].cend(); it++)
-        {
-            if (inst->seqNum > it->inst->seqNum) {
-                res = it->pid;
-                found  = true;
-            } 
-            else {
-                break;
-            }
-        }
-        // if we can't find anything, it means the commit version is valid and is the latest
-        if (!found)
-        {
-            res = CommitArchRegsPid[src1];
-        }
-        inst->dyn_pid = res;
-        inst->staticInst->setStaticPointerID(res);
-
-        DPRINTF(PointerDepGraph, "Updated PID for Bounds Check Instruction: [%d][%s][%s][%s]\n", 
-                inst->seqNum,
-                inst->pcState(), 
-                inst->staticInst->disassemble(inst->pcState().instAddr()),
-                inst->dyn_pid);
-
-        return;
-    }
+    if (inst->isStore()) {updatePointerTrackerForStoreMicroop(inst); return;}
+    else if (inst->isBoundsCheckMicroop()) {updateBoundsCheckMicroop(inst);return;}
+    // some instructions need to be verifed at the exec stage to make sure that their 
+    // propagations are correct. If not correct, we will run an update. This is modeled by a 
+    // n cycle delay in exec
+    // This is only should be done for add/addi with size 8, as other versions are assumed to be zero always
+    else if (inst->staticInst->getName() == "add")  {updatePointerTrackerForAddMicroop(inst, tc); return;}
+    else if (inst->staticInst->getName() == "lea") {updatePointerTrackerForLeaMicroop(inst, tc); return;}
     else 
     {
         assert(false && "getUpdatedPID is called for a non store or bounds check!\n");
@@ -2282,4 +2190,341 @@ PointerDependencyGraph<Impl>::TransferXorImmMicroops(DynInstPtr &inst, bool trac
 }
 
 
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updatePointerTrackerForStoreMicroop(DynInstPtr &inst)
+{
+
+        assert((inst->staticInst->getName() == "st" || inst->staticInst->getName() == "stis") && 
+                "updatePointerTrackerForStoreMicroop is called fro a store that is not st/stis\n");
+        assert(inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+        const uint8_t dataSize = inst_regop->dataSize;
+        assert(dataSize == 8 && "dataSize is not equal to 8!\n");
+
+        X86ISAInst::St * inst_st = dynamic_cast<X86ISAInst::St*>(inst->staticInst.get()); 
+        X86ISAInst::Stis * inst_stis = dynamic_cast<X86ISAInst::Stis*>(inst->staticInst.get()); 
+        assert((inst_st != nullptr || inst_stis != nullptr) && "Found a st inst that is not X86ISA::St or X86ISA::Stis!\n");
+    
+
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;//base
+        uint16_t src2 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //data
+        
+        DPRINTF(PointerDepGraph, "Store Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID());
+
+        inst->dyn_pid = CommitArchRegsPid[src2];
+        inst->staticInst->setStaticPointerID(CommitArchRegsPid[src2]);
+
+        DPRINTF(PointerDepGraph, "Updated PID for Store Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID());
+
+        // now go through all the pointer refills that use this pointer spill and make sure they are in sync!
+        syncPointerRefills(inst);
+}
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updateBoundsCheckMicroop(DynInstPtr &inst)
+{
+        assert(inst->isLoad() && "A non-load bounds chec k microop!\n");
+        assert(inst->staticInst->getName() == "ld" && "A non-ld bounds check!\n");
+        assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+        const uint8_t dataSize = inst_regop->dataSize;
+        assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); //base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); dest = dest;//dest
+
+        DPRINTF(PointerDepGraph, "Updating PID for Bounds Check Instruction: [%d][%s][%s][%s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid);
+        DPRINTF(PointerDepGraph, "Selected Dependency Graph:\n");
+        dump();
+
+        // if (dependGraph[src1].empty()) {
+        //     DPRINTF(PointerDepGraph, "Dependency Graph is Empty for this Base: %s\n", TheISA::IntRegIndexStr(src1));
+        //     return;
+        // }
+        //if (inst->seqNum > dependGraph[src1].back().inst->seqNum) return inst->dyn_pid;
+        //look at the latest value of PID for base register
+        TheISA::PointerID res = inst->dyn_pid;
+        bool found = false;
+        for (auto it = dependGraph[src1].cbegin(); it != dependGraph[src1].cend(); it++)
+        {
+            if (inst->seqNum > it->inst->seqNum) {
+                res = it->pid;
+                found  = true;
+            } 
+            else {
+                break;
+            }
+        }
+        // if we can't find anything, it means the commit version is valid and is the latest
+        if (!found)
+        {
+            res = CommitArchRegsPid[src1];
+        }
+        inst->dyn_pid = res;
+        inst->staticInst->setStaticPointerID(res);
+
+        DPRINTF(PointerDepGraph, "Updated PID for Bounds Check Instruction: [%d][%s][%s][%s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid);
+
+}
+
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::doUpdateForNoneLoadMicroops(DynInstPtr& inst)
+{
+    
+
+    assert((inst->staticInst->getName() == "add" || inst->staticInst->getName() == "lea") && 
+            "Not a valid instruction called with doUpdateForNonLoadMicroops()\n");
+    assert(inst->staticInst->getDataSize() == 8 && "data size is not 8!");
+
+    DPRINTF(PointerDepGraph, "doUpdateForNonLoadMicroops:: Updating Pointer Tracker for Instruction: [%d][%s][%s]\n", 
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()));
+    DPRINTF(PointerDepGraph, "doUpdateForNonLoadMicroops:: Dependency Graph Before Updating:\n");
+    dump();
+
+
+    // find the desginated uop
+    // we should defenitly find it othersie it's a panic!
+    // doUpdate happends before squash so we should find it in the DEP Graph
+    bool found = false;
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) 
+    {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].begin(); it != dependGraph[indx].end(); it++)
+        {
+            //if found: update and return
+            if (it->inst->seqNum == inst->seqNum) {
+                // get the actual PID for this load
+                TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+                // insert an entry for the destination reg
+                X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+                uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
+                inst->FetchArchRegsPid[dest] = _pid;
+                it->pid = _pid;
+                found = true;
+                break;
+
+            }
+        }
+
+    } // for loop
+    // this is called at the commit stage, there is no way that the microop is squashed!
+    assert(found && "Cannot find the designated microop!\n");
+
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        FetchArchRegsPid[indx] = inst->FetchArchRegsPid[indx];
+    }
+
+    DPRINTF(PointerDepGraph, "FetchArchRegsPids Reg Before Update:\n");
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        DPRINTF(PointerDepGraph, "FetchArchRegsPids[%s]  = %s\n", 
+                TheISA::IntRegIndexStr(indx) , FetchArchRegsPid[indx]);
+    }
+
+    std::map<uint64_t, uint64_t> MicroopsToUpdate;
+    // order the microops that are tracked after this pointer refill
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].cbegin(); it != dependGraph[indx].cend(); it++)
+        {
+            if (it->inst->seqNum > inst->seqNum) {
+                MicroopsToUpdate.insert(std::make_pair(it->inst->seqNum, indx));
+            }
+        }
+    }
+
+    // now one by one find all the instruction with seqNum greater
+    // than load uop and update their uops in order!
+    for (auto& microops : MicroopsToUpdate)
+    {
+        uint64_t SeqNumber = microops.first;
+        uint64_t Indx = microops.second;
+        for (auto it = dependGraph[Indx].begin(); it != dependGraph[Indx].end(); it++)
+        {
+            if (it->inst->seqNum == SeqNumber) {
+                InternalUpdate(it->inst, false);
+                it->pid = it->inst->dyn_pid;
+                break;
+            }
+        }
+    }
+
+
+
+    DPRINTF(PointerDepGraph, "doUpdateForNonLoadMicroops::Dependency Graph After Updating:\n");
+    dump();
+
+
+}
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updatePointerTrackerForAddMicroop(DynInstPtr &inst, ThreadContext* tc)
+{
+
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::RegOp * inst_regop = (TheISA::RegOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+    // no need to update this add microops as they should return PID(0)!
+    if (dataSize == 4 || dataSize == 2 || dataSize == 1) return;
+
+    X86ISAInst::Add * inst_add = dynamic_cast<X86ISAInst::Add*>(inst->staticInst.get()); 
+    X86ISAInst::AddBig * inst_add_big = dynamic_cast<X86ISAInst::AddBig*>(inst->staticInst.get()); 
+    
+    X86ISAInst::AddFlags * inst_add_flags = dynamic_cast<X86ISAInst::AddFlags*>(inst->staticInst.get());
+    X86ISAInst::AddFlagsBig * inst_add_flags_big = dynamic_cast<X86ISAInst::AddFlagsBig*>(inst->staticInst.get());
+
+    assert((inst_add != nullptr || inst_add_big != nullptr ||
+            inst_add_flags != nullptr || inst_add_flags_big != nullptr) 
+            && "Found an add inst that is not Add/AddBig or AddFlags/AddFlagsBig!\n");
+
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); dest = dest;
+
+
+        
+    DPRINTF(PointerDepGraph, "Add Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()),
+            inst->dyn_pid,
+            inst->staticInst->getStaticPointerID());
+
+
+    // read the data
+    uint64_t  dataRegContent = inst->readDestReg(inst->staticInst.get(), 0); 
+    
+    // this is logically equal to a comparison
+    TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForAddMicroop:: Checking Alias for dataRegContent[%s]=%x=%s\n", 
+                            TheISA::IntRegIndexStr(dest), dataRegContent, _pid);
+
+    // our assumption is that all the add instructions always transfer thier sources to thier 
+    // destinations. Sometimes this is not true and the result is PID(0) although the sources are PID(n)
+    // in this case we need to update the pointer tracker 
+    if (_pid == TheISA::PointerID(0) && inst->dyn_pid != _pid)
+    {
+        DPRINTF(PointerDepGraph, "updatePointerTrackerForAddMicroop:: Update is needed as Add microop is not synced! inst->dyn_pid%s != %s\n", 
+                            inst->dyn_pid, _pid);
+        inst->dyn_pid = _pid;
+        inst->staticInst->setStaticPointerID(_pid);  
+        doUpdateForNoneLoadMicroops(inst);  
+    }
+
+    DPRINTF(PointerDepGraph, "Updated PID for Add Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID()); 
+            
+            
+
+}
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updatePointerTrackerForLeaMicroop(DynInstPtr &inst, ThreadContext* tc)
+{
+    
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4);
+
+    // All 4 byes Lea microops return PID(0)
+    if (dataSize == 4) return;
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;//base
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); dest = dest;//dest
+
+
+    
+    X86ISAInst::Lea * inst_lea = dynamic_cast<X86ISAInst::Lea*>(inst->staticInst.get()); 
+    assert((inst_lea != nullptr) && "Found a 8 bytes lea inst that is not X86ISA::Lea!\n");
+
+
+
+        
+    DPRINTF(PointerDepGraph, "Lea Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()),
+            inst->dyn_pid,
+            inst->staticInst->getStaticPointerID());
+
+
+    // read the data
+    uint64_t  dataRegContent = inst->readDestReg(inst->staticInst.get(), 0); 
+    
+    // this is logically equal to a comparison
+    TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForLeaMicroop:: Checking Alias for dataRegContent[%s]=%x=%s\n", 
+                            TheISA::IntRegIndexStr(dest), dataRegContent, _pid);
+
+    // our assumption is that all the add instructions always transfer thier sources to thier 
+    // destinations. Sometimes this is not true and the result is PID(0) although the sources are PID(n)
+    // in this case we need to update the pointer tracker 
+    if (_pid == TheISA::PointerID(0) && inst->dyn_pid != _pid)
+    {
+        DPRINTF(PointerDepGraph, "updatePointerTrackerForLeaMicroop:: Update is needed as Lea microop is not synced! inst->dyn_pid%s != %s\n", 
+                            inst->dyn_pid, _pid);
+        inst->dyn_pid = _pid;
+        inst->staticInst->setStaticPointerID(_pid);  
+        doUpdateForNoneLoadMicroops(inst);  
+    }
+
+    DPRINTF(PointerDepGraph, "Updated PID for Lea Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID()); 
+            
+
+}
 #endif // __CPU_O3_DEP_GRAPH_HH__
