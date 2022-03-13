@@ -95,6 +95,7 @@ typedef
       Addr        payload;
       SizeT       req_szB;
       Addr        pid;
+      Addr        tid;     
       ULong       n_reads;
       ULong       n_writes;
       Addr        seqNum;

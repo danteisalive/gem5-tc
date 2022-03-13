@@ -821,8 +821,10 @@ PointerDependencyGraph<Impl>::readPIDFromIntervalTree(Addr vaddr, ThreadContext*
     assert(foundkey != 1 && "foundkey != 1\n");
     Block* res = (Block*)foundkey;
     assert(res != &fake && "res != &fake\n");
+    assert(res->pid != 0 && "res->pid == 0 ");
+    assert(res->tid != 0 && "res->tid == 0");
 
-    return TheISA::PointerID(res->pid);
+    return TheISA::PointerID(res->pid, res->tid);
 
 }
 
@@ -1171,10 +1173,11 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track, 
             // this is at commit to make sure everything is right! Don't do anything!
             if (sanity)
             {
-                if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && CommitArchRegsPid[src1] != TheISA::PointerID(0))
-                {
-                    assert(false && "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
-                }
+                // if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
+                //     CommitArchRegsPid[src1] != TheISA::PointerID(0))
+                // {
+                //     assert(false && "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
+                // }
                 return;
             }
 
@@ -1185,8 +1188,18 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track, 
                 FetchArchRegsPid[src1].GetPointerID());
 
 
-            TheISA::PointerID _pid = FetchArchRegsPid[src1];
-
+            TheISA::PointerID _pid = TheISA::PointerID(0);
+            if (dataSize == 8)
+            {
+                _pid = FetchArchRegsPid[src1];
+            }
+            else 
+            {
+                // sometimes the source operand can be a pointer in a 1/2/4 mov but we know that 
+                // dest register is always 0
+                _pid = TheISA::PointerID(0);
+            }
+            
             FetchArchRegsPid[dest] = _pid;
 
             if (track)
@@ -1341,8 +1354,12 @@ PointerDependencyGraph<Impl>::TransferLoadMicroops(DynInstPtr &inst, bool track,
         // this is at commit to make sure everything is right! Don't do anything!
         if (sanity)
         {
-           panic_if(CommitArchRegsPid[src0] != TheISA::PointerID(0), 
-                        "TransferLoadeMicroops :: Found a 1/2 Ld Microop with non-zero PID Index!\n");
+           panic_if(inst_regop->getScale() != 1 && 
+                    CommitArchRegsPid[src0] != TheISA::PointerID(0), 
+                    "TransferLoadeMicroops :: Found a 1/2 Ld Microop with non-zero PID Index! SRC[%s] = %s SRC[%s] = %s Scale = %u\n",
+                    TheISA::IntRegIndexStr(src0), CommitArchRegsPid[src0],
+                    TheISA::IntRegIndexStr(src1), CommitArchRegsPid[src1], 
+                    inst_regop->getScale());
             return;
         }
        
@@ -1716,6 +1733,7 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
                 "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
         // dest = src0(PID(0)) - src1(PID(n))
         panic_if((dataSize == 8) && 
+                (inst_sub != nullptr || inst_sub_big != nullptr) &&
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && 
                 CommitArchRegsPid[src0] == TheISA::PointerID(0)), 
                 "TransferSubMicroops :: Found a Sub inst with src1 reg non-zero PID but src0 reg zeo PID! "
@@ -2722,6 +2740,9 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(Dyn
         uint64_t  dataRegContent = cpu->readArchIntReg(indx, inst->threadNumber);
         // this is logically equal to a comparison with RAX reg
         TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+        
+        DPRINTF(PointerDepGraph, "REG[%s] = Value[%x] Current PID = %s Inst. PID = %s FetchArchRegsPid = %s\n", 
+                TheISA::IntRegIndexStr(indx), dataRegContent, _pid, inst->dyn_pid, inst->FetchArchRegsPid[indx]);
 
         if (_pid == TheISA::PointerID(0))
         {
@@ -2729,11 +2750,11 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(Dyn
         }
         else 
         {
-            assert(_pid == inst->dyn_pid && "_pid != inst->dyn_inst!\n");
+            //assert(_pid == inst->dyn_pid && "_pid != inst->dyn_inst!\n");
             if (indx == X86ISA::INTREG_RAX) 
                 assert(inst->FetchArchRegsPid[indx] == _pid && "inst->FetchArchRegsPid[indx] != _pid\n");
 
-            inst->FetchArchRegsPid[indx] = inst->dyn_pid;
+            inst->FetchArchRegsPid[indx] = _pid;
 
         }
 

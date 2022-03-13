@@ -1593,6 +1593,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
         bk->payload   = (Addr)_pid_base;
         bk->req_szB   = (SizeT)tc->ap_size;
         bk->pid       = (Addr)_pid_num;
+        bk->tid       = (Addr)inst->pcState().instAddr();
         bk->seqNum    = inst->seqNum;
         unsigned char present =
                       VG_addToFM(tc->interval_tree, (UWord)bk, (UWord)0);
@@ -1690,6 +1691,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
          bk->payload   = (Addr)_pid_base;
          bk->req_szB   = (SizeT)tc->ap_size;
          bk->pid       = (Addr)_pid_num;
+         bk->tid       = (Addr)inst->pcState().instAddr();
          bk->seqNum    = inst->seqNum;
          unsigned char present =
                       VG_addToFM(tc->interval_tree, (UWord)bk, (UWord)0);
@@ -1704,46 +1706,46 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     }
     else if (inst->isReallocSizeCollectorMicroop()){
 
-      if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::NONE)
-          panic("AP_REALLOC_SIZE_COLLECT: Invalid Status!");
+        if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::NONE)
+            panic("AP_REALLOC_SIZE_COLLECT: Invalid Status!");
 
-      uint64_t _pid_num = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
-      uint64_t _pid_base_arg1 = inst->readDestReg(inst->staticInst.get(),0); //RDI
-      uint64_t _pid_size_arg2 = inst->readIntRegOperand(inst->staticInst.get(),0); //RSI
+        uint64_t _pid_num = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
+        uint64_t _pid_base_arg1 = inst->readDestReg(inst->staticInst.get(),0); //RDI
+        uint64_t _pid_size_arg2 = inst->readIntRegOperand(inst->staticInst.get(),0); //RSI
 
-      uint64_t old_base_addr = _pid_base_arg1;
-      tc->ap_size = _pid_size_arg2;
-      tc->ap_pid = _pid_num;
-      tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
-
-      DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
-                "REALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
-                tc->ap_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
-
-      TheISA::PointerID _pid = TheISA::PointerID(0);
-      Block fake;
-      fake.payload = old_base_addr;
-      fake.req_szB = 1;
-      UWord oldKeyW;
-      unsigned char found = VG_delFromFM(tc->interval_tree, &oldKeyW, NULL, (Addr)&fake );
-
-      if (found){
-        Block* bk = (Block*)oldKeyW;
-        assert(bk);
-        assert(bk->pid != 0);
-        _pid = TheISA::PointerID(bk->pid);
-        free(bk);
-        tc->num_of_allocations--;
-      }
-
-      if (_pid != TheISA::PointerID(0))
-      {
-        // cpu->ExeAliasCache->Invalidate(tc, _pid);
+        uint64_t old_base_addr = _pid_base_arg1;
+        tc->ap_size = _pid_size_arg2;
+        tc->ap_pid = _pid_num;
+        tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
 
         DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
-                "REALLOC CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
-                old_base_addr, _pid, inst->seqNum, inst->pcState().instAddr());
-      }
+                    "REALLOC SIZE=%d PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                    tc->ap_size, _pid_num, inst->seqNum, inst->pcState().instAddr());
+
+        TheISA::PointerID _pid = TheISA::PointerID(0);
+        Block fake;
+        fake.payload = old_base_addr;
+        fake.req_szB = 1;
+        UWord oldKeyW;
+        unsigned char found = VG_delFromFM(tc->interval_tree, &oldKeyW, NULL, (Addr)&fake );
+
+        if (found){
+            Block* bk = (Block*)oldKeyW;
+            assert(bk);
+            assert(bk->pid != 0);
+            _pid = TheISA::PointerID(bk->pid);
+            free(bk);
+            tc->num_of_allocations--;
+        }
+
+        if (_pid != TheISA::PointerID(0))
+        {
+            // cpu->ExeAliasCache->Invalidate(tc, _pid);
+
+            DPRINTF(Allocator, "DefaultCommit<Impl>::collector::"
+                    "REALLOC CALL=0x%x PID=%d SEQNUM=%d PCADDR=0x%x\n",
+                    old_base_addr, _pid, inst->seqNum, inst->pcState().instAddr());
+        }
 
 
     }
@@ -1765,6 +1767,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             bk->payload   = (Addr)_pid_base;
             bk->req_szB   = (SizeT)tc->ap_size;
             bk->pid       = (Addr)_pid_num;
+            bk->tid       = (Addr)inst->pcState().instAddr();
             bk->seqNum    = inst->seqNum;
             unsigned char present =
                       VG_addToFM(tc->interval_tree, (UWord)bk, (UWord)0);
