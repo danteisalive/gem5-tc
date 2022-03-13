@@ -50,8 +50,8 @@
 
 
 template <class Impl>
-PointerDependencyGraph<Impl>::PointerDependencyGraph()
-        : numEntries(0), memAllocCounter(0), nodesTraversed(0), nodesRemoved(0)
+PointerDependencyGraph<Impl>::PointerDependencyGraph(O3CPU *_cpu )
+        :isTypeTrackerEnabled(true), cpu(_cpu), numEntries(0), memAllocCounter(0), nodesTraversed(0), nodesRemoved(0)
 {
         for (int i = 0; i < TheISA::NumIntRegs; ++i) {
             dependGraph[i].clear();
@@ -62,8 +62,6 @@ PointerDependencyGraph<Impl>::PointerDependencyGraph()
         TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::fstream::out);
         TyCHEAliasSanityCheckFile.close();
 
-        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
-        isTypeTrackerEnabled = true;
 }
 
 template <class Impl>
@@ -363,9 +361,15 @@ PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst, ThreadC
     // This is only should be done for add/addi with size 8, as other versions are assumed to be zero always
     else if (inst->staticInst->getName() == "add")  {updatePointerTrackerForAddMicroop(inst, tc); return;}
     else if (inst->staticInst->getName() == "lea") {updatePointerTrackerForLeaMicroop(inst, tc); return;}
+    else if (inst->isReallocBaseCollectorMicroop() ||
+            inst->isMallocBaseCollectorMicroop() ||
+            inst->isCallocBaseCollectorMicroop())
+    {
+        //updatePointerTrackerForAPBaseCollectorMicroops(inst, tc); return;
+    }
     else 
     {
-        assert(false && "getUpdatedPID is called for a non store or bounds check!\n");
+        return;
     }
 
 }
@@ -2551,6 +2555,7 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForAddMicroop(DynInstPtr &inst
 
 }
 
+
 template <class Impl>
 void
 PointerDependencyGraph<Impl>::updatePointerTrackerForLeaMicroop(DynInstPtr &inst, ThreadContext* tc)
@@ -2616,4 +2621,43 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForLeaMicroop(DynInstPtr &inst
             
 
 }
+
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(DynInstPtr &inst, ThreadContext* tc)
+{
+   
+    DPRINTF(PointerDepGraph, "Allocation Point Microop Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()),
+            inst->dyn_pid,
+            inst->staticInst->getStaticPointerID());
+            
+
+    
+    // for specific registers check whether they are synced or not
+    // At this point, the collector in commit stage has added the new allocatoed object into
+    // the capapbility cache
+    for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
+        // read the data
+        uint64_t  dataRegContent = cpu->readArchIntReg(i, inst->threadNumber);
+        // this is logically equal to a comparison with RAX reg
+        TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+
+        if (CommitArchRegsPid[i] != _pid)
+        {
+            setFetchArchRegsPidArray(i, _pid);
+            setCommitArchRegsPidArray(i, _pid);
+        }
+
+
+        
+    }
+    
+
+
+}
+
 #endif // __CPU_O3_DEP_GRAPH_HH__

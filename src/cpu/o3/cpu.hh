@@ -145,7 +145,7 @@ class FullO3CPU : public BaseO3CPU
     /** Overall CPU status. */
     Status _status;
 
-    PointerDependencyGraph<Impl> PointerDepGraph;
+    // PointerDependencyGraph<Impl> PointerDepGraph;
 
   private:
 
@@ -645,6 +645,8 @@ class FullO3CPU : public BaseO3CPU
 
     /** The commit stage. */
     typename CPUPolicy::Commit commit;
+
+    PointerDependencyGraph<Impl> PointerDepGraph;
 
     /** The rename mode of the vector registers */
     Enums::VecRegRenameMode vecMode;

@@ -81,16 +81,18 @@ class PointerDependencyEntry
 template <class Impl>
 class PointerDependencyGraph
 {
-  private:
-    // ThreadContext::COLLECTOR_STATUS typeTrackerStatus;
-    bool isTypeTrackerEnabled;
-
   public:
+    typedef typename Impl::O3CPU O3CPU;
     typedef typename Impl::DynInstPtr DynInstPtr;
     typedef PointerDependencyEntry<Impl> PointerDepEntry;
 
+  public:
+
+    bool isTypeTrackerEnabled;
+    /** Pointer to O3CPU. */
+    O3CPU *cpu;
     /** Default construction.  Must call resize() prior to use. */
-    PointerDependencyGraph();
+    PointerDependencyGraph(O3CPU* _cpu);
 
     ~PointerDependencyGraph();
 
@@ -117,6 +119,7 @@ class PointerDependencyGraph
     void updatePointerTrackerForStoreMicroop(DynInstPtr &inst);
     void updatePointerTrackerForAddMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForLeaMicroop(DynInstPtr &inst, ThreadContext* tc);
+    void updatePointerTrackerForAPBaseCollectorMicroops(DynInstPtr &inst, ThreadContext* tc);
     void updateBoundsCheckMicroop(DynInstPtr &inst);
     bool updateTypeTrackerState();
     /** Debugging function to dump out the dependency graph.

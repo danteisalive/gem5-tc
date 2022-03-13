@@ -152,6 +152,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
       rename(this, params),
       iew(this, params),
       commit(this, params),
+      PointerDepGraph(this),
 
       /* It is mandatory that all SMT threads use the same renaming mode as
        * they are sharing registers and rename */

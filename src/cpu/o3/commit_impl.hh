@@ -1334,8 +1334,7 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         {
             CommitUpdateAliasTableInCommit(tid, head_inst);
         }
-        else if (head_inst->staticInst->getName() == "add" || 
-                 head_inst->staticInst->getName() == "lea")
+        else
         {
             cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst, tc);
         }
