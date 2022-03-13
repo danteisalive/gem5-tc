@@ -361,12 +361,6 @@ PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst, ThreadC
     // This is only should be done for add/addi with size 8, as other versions are assumed to be zero always
     else if (inst->staticInst->getName() == "add")  {updatePointerTrackerForAddMicroop(inst, tc); return;}
     else if (inst->staticInst->getName() == "lea") {updatePointerTrackerForLeaMicroop(inst, tc); return;}
-    else if (inst->isReallocBaseCollectorMicroop() ||
-            inst->isMallocBaseCollectorMicroop() ||
-            inst->isCallocBaseCollectorMicroop())
-    {
-        //updatePointerTrackerForAPBaseCollectorMicroops(inst, tc); return;
-    }
     else 
     {
         return;
@@ -785,7 +779,7 @@ PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadCont
                 // this is only true when we are actualy outside of the APs
                 if (head_inst->isTypeTracked())
                     assert((_pid == head_inst->dyn_pid) &&
-                        "Failed to verify that alias and dynamic pid are the same!\n");
+                        "Failed to verify that alias and dynamic pid are the same for the store microop!\n");
             }
 
             
@@ -2623,12 +2617,14 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForLeaMicroop(DynInstPtr &inst
 }
 
 
+// This function is called after doCommit, therefore we can't find the microop in the 
+// pointer depdenecy graph
 template <class Impl>
 void
 PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(DynInstPtr &inst, ThreadContext* tc)
 {
    
-    DPRINTF(PointerDepGraph, "Allocation Point Microop Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForAPBaseCollectorMicroops::Allocation Point Microop Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
             inst->seqNum,
             inst->pcState(), 
             inst->staticInst->disassemble(inst->pcState().instAddr()),
@@ -2636,28 +2632,86 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(Dyn
             inst->staticInst->getStaticPointerID());
             
 
-    
+    DPRINTF(PointerDepGraph, "FetchArchRegsPids Reg Before AP Update:\n");
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        DPRINTF(PointerDepGraph, "FetchArchRegsPids[%s]  = %s\n", 
+                TheISA::IntRegIndexStr(indx) , FetchArchRegsPid[indx]);
+    }
+
     // for specific registers check whether they are synced or not
     // At this point, the collector in commit stage has added the new allocatoed object into
     // the capapbility cache
-    for (size_t i = 0; i < X86ISA::NUM_INTREGS; i++) {
+    for (size_t indx = 0; indx < X86ISA::NUM_INTREGS; indx++) {
         // read the data
-        uint64_t  dataRegContent = cpu->readArchIntReg(i, inst->threadNumber);
+        uint64_t  dataRegContent = cpu->readArchIntReg(indx, inst->threadNumber);
         // this is logically equal to a comparison with RAX reg
         TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
 
-        if (CommitArchRegsPid[i] != _pid)
+        if (_pid == TheISA::PointerID(0))
         {
-            setFetchArchRegsPidArray(i, _pid);
-            setCommitArchRegsPidArray(i, _pid);
+            assert(inst->FetchArchRegsPid[indx] == _pid && "inst->FetchArchRegsPid[indx] != _pid\n");
+        }
+        else 
+        {
+            assert(_pid == inst->dyn_pid && "_pid != inst->dyn_inst!\n");
+            if (indx == X86ISA::INTREG_RAX) 
+                assert(inst->FetchArchRegsPid[indx] == _pid && "inst->FetchArchRegsPid[indx] != _pid\n");
+
+            inst->FetchArchRegsPid[indx] = inst->dyn_pid;
+
         }
 
-
-        
     }
     
 
 
+
+
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        FetchArchRegsPid[indx] = inst->FetchArchRegsPid[indx];
+        CommitArchRegsPid[indx] = inst->FetchArchRegsPid[indx];
+    }
+
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForAPBaseCollectorMicroops::FetchArchRegsPids Reg After AP Update and Before Recursive Update:\n");
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        DPRINTF(PointerDepGraph, "FetchArchRegsPids[%s]  = %s\n", 
+                TheISA::IntRegIndexStr(indx) , FetchArchRegsPid[indx]);
+    }
+
+    std::map<uint64_t, uint64_t> MicroopsToUpdate;
+    // order the microops that are tracked after this pointer refill
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].cbegin(); it != dependGraph[indx].cend(); it++)
+        {
+            if (it->inst->seqNum > inst->seqNum) {
+                MicroopsToUpdate.insert(std::make_pair(it->inst->seqNum, indx));
+            }
+        }
+    }
+
+    // now one by one find all the instruction with seqNum greater
+    // than load uop and update their uops in order!
+    for (auto& microops : MicroopsToUpdate)
+    {
+        uint64_t SeqNumber = microops.first;
+        uint64_t Indx = microops.second;
+        for (auto it = dependGraph[Indx].begin(); it != dependGraph[Indx].end(); it++)
+        {
+            if (it->inst->seqNum == SeqNumber) {
+                InternalUpdate(it->inst, false);
+                it->pid = it->inst->dyn_pid;
+                break;
+            }
+        }
+    }
+
+
+
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForAPBaseCollectorMicroops::Dependency Graph After Updating:\n");
+    dump();
+
+    // assert(0);
 }
 
 #endif // __CPU_O3_DEP_GRAPH_HH__

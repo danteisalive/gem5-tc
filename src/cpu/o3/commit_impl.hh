@@ -1354,6 +1354,14 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         cpu->PointerDepGraph.doCommit(head_inst);
     }
 
+    // perform this after RAX is updated by doCommit
+    if (tc->enableCapability &&
+        (head_inst->isReallocBaseCollectorMicroop() ||
+        head_inst->isMallocBaseCollectorMicroop() ||
+        head_inst->isCallocBaseCollectorMicroop()))
+    {
+        cpu->PointerDepGraph.updatePointerTrackerForAPBaseCollectorMicroops(head_inst, tc);
+    }
 
 
     if (head_inst->traceData) {
