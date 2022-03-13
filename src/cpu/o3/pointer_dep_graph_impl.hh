@@ -211,7 +211,8 @@ PointerDependencyGraph<Impl>::updateTypeTrackerState()
                 }
                 else if (it->inst->isReallocSizeCollectorMicroop())
                 {   
-                    assert(0);
+                    // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+                    isTypeTrackerEnabled = false;
                 } 
                 else if (it->inst->isFreeCallMicroop())
                 {
@@ -462,11 +463,19 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
     }
     else if (inst->isReallocSizeCollectorMicroop())
     {
-        assert(0);
+
+        assert(inst->dyn_pid  != TheISA::PointerID(0) &&
+                "isreallocSizeCollectorMicroop :: Found a Realloc Microop with non-zero RDI PID Parameter!\n");
+
+        assert(CommitArchRegsPid[X86ISA::INTREG_RDI] != TheISA::PointerID(0) && 
+                "Found a Realloc microop with zero pid for RDI!\n");
+        assert(CommitArchRegsPid[X86ISA::INTREG_RSI] == TheISA::PointerID(0) && 
+                "Found a Realloc microop with non-zero pid for RSI!\n");
     }
     else if (inst->isReallocBaseCollectorMicroop())
     {
-        assert(0);
+        assert(inst->dyn_pid != TheISA::PointerID(0) && 
+                "isM/CallocBaseCollectorMicroop :: Found a Realloc Call Microop with zero PID Return Value!\n");  
     }
     else if (inst->isFreeCallMicroop())
     {
@@ -717,6 +726,73 @@ PointerDependencyGraph<Impl>::checkTyCHESanity(DynInstPtr& head_inst, ThreadCont
         // check bounds check sanity!
 
     }
+    else if (head_inst->isStore())
+    {
+        // for now just do it for the aliases
+        if (head_inst->staticInst->getName() != "st" && 
+            head_inst->staticInst->getName() != "stis") return true;
+
+        assert(head_inst->numIntDestRegs() == 0 && "Invalid number of dest regs!\n");
+        TheISA::LdStOp * inst_regop = (TheISA::LdStOp * )head_inst->staticInst.get(); 
+        assert(inst_regop != nullptr && "inst_regop is null!\n"); 
+        const uint8_t dataSize = inst_regop->dataSize;
+        assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+
+        X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)head_inst->staticInst.get();
+
+        uint16_t src0 = x86_inst->getUnflattenRegIndex(head_inst->srcRegIdx(0)); src0 = src0;//index
+        uint16_t src1 = x86_inst->getUnflattenRegIndex(head_inst->srcRegIdx(1)); src1 = src1;//base
+        uint16_t dest = x86_inst->getUnflattenRegIndex(head_inst->srcRegIdx(2)); dest = dest; //dest
+
+        // check whether this is a pointer refill and whether it's tracking the right PID/TID
+        if (dataSize == 8)
+        {
+            // read the data
+            uint64_t  dataRegContent = 
+                head_inst->readIntRegOperand(head_inst->staticInst.get(), 2); // src(2) is the data register
+            
+            TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+
+            DPRINTF(PointerDepGraph, "checkTyCHESanity:: Checking Alias for dataRegContent[%s]=%x\n", 
+                    TheISA::IntRegIndexStr(dest), dataRegContent);
+
+
+            Trace::InstRecord * trace = head_inst->traceData;
+            Trace::ExeTracerRecord * execTraceRecord = dynamic_cast<Trace::ExeTracerRecord*>(trace);
+            assert(execTraceRecord && "null trace is found!\n");
+
+            if ((_pid != TheISA::PointerID(0)) || (head_inst->dyn_pid != TheISA::PointerID(0)))
+            {   
+                std::ofstream TyCHEAliasSanityCheckFile;
+                // File Open
+                TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+                TyCHEAliasSanityCheckFile << _pid << " " << head_inst->dyn_pid << "\n"; 
+                
+                if ((_pid != head_inst->dyn_pid))
+                    TyCHEAliasSanityCheckFile << "Failed to verify that alias and dynamic pid are the same!\n";
+
+                if (execTraceRecord)
+                    execTraceRecord->dump(TyCHEAliasSanityCheckFile);
+                
+                // File Close
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+                TyCHEAliasSanityCheckFile.close();
+                // this is only true when we are actualy outside of the APs
+                if (head_inst->isTypeTracked())
+                    assert((_pid == head_inst->dyn_pid) &&
+                        "Failed to verify that alias and dynamic pid are the same!\n");
+            }
+
+            
+
+        }
+
+        return true;
+        // Boulds check could be any size
+        // check bounds check sanity!
+
+    }
 
 
 
@@ -913,11 +989,24 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
     }
     else if ((track) && inst->isReallocBaseCollectorMicroop())
     {
-        assert(0 && "inst->isReallocBaseCollectorMicroop!\n");
+        // here we generate a new PID and insert it into rax
+        dependGraph[X86ISA::INTREG_RAX].push_front(PointerDepEntry(inst, inst->dyn_pid));
+        FetchArchRegsPid[X86ISA::INTREG_RAX] = inst->dyn_pid;
+
+        DPRINTF(PointerDepGraph, " Enabling Type Tracker! Realloc base collector is called! Assigned PID=%s!\n", 
+                FetchArchRegsPid[X86ISA::INTREG_RAX]);
+        
+        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+        isTypeTrackerEnabled = true;
     }
     else if ((track) &&  inst->isReallocSizeCollectorMicroop())
     {
-        assert(0 && "inst->isReallocSizeCollectorMicroop()\n");
+        dependGraph[X86ISA::INTREG_RDI].push_front(PointerDepEntry(inst, FetchArchRegsPid[X86ISA::INTREG_RDI]));
+        inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
+
+        isTypeTrackerEnabled = false;
+
+        DPRINTF(PointerDepGraph, "Realloc size collector is called! Disabling the type tracker!\n");
     }
     else if ((track) && inst->isFreeCallMicroop())
     {

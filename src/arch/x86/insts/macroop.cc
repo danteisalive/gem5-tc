@@ -621,7 +621,7 @@ MacroopBase::injectAPMallocBaseCollector(ThreadContext * _tc, PCState &nextPC){
                        (1ULL << StaticInst::IsFirstMicroop),
                        //(1ULL << StaticInst::IsSerializing)|
                        //(1ULL << StaticInst::IsSerializeBefore),
-                       InstRegIndex(X86ISA::INTREG_RDI),
+                       InstRegIndex(X86ISA::INTREG_RSI),
                        InstRegIndex(X86ISA::INTREG_RDI),
                        InstRegIndex(X86ISA::INTREG_RDI),
                        8,

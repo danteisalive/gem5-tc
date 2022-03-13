@@ -1701,10 +1701,8 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
           panic("AP_REALLOC_SIZE_COLLECT: Invalid Status!");
 
       uint64_t _pid_num = cpu->readArchIntReg(X86ISA::INTREG_R16, tid) + 1;
-      uint64_t _pid_base_arg1 =
-                    inst->readDestReg(inst->staticInst.get(),0); //RDI
-      uint64_t _pid_size_arg2 =
-                    inst->readIntRegOperand(inst->staticInst.get(),0); //RSI
+      uint64_t _pid_base_arg1 = inst->readDestReg(inst->staticInst.get(),0); //RDI
+      uint64_t _pid_size_arg2 = inst->readIntRegOperand(inst->staticInst.get(),0); //RSI
 
       uint64_t old_base_addr = _pid_base_arg1;
       tc->ap_size = _pid_size_arg2;
@@ -1720,8 +1718,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
       fake.payload = old_base_addr;
       fake.req_szB = 1;
       UWord oldKeyW;
-      unsigned char found = VG_delFromFM(tc->interval_tree,
-                                   &oldKeyW, NULL, (Addr)&fake );
+      unsigned char found = VG_delFromFM(tc->interval_tree, &oldKeyW, NULL, (Addr)&fake );
 
       if (found){
         Block* bk = (Block*)oldKeyW;
@@ -1745,8 +1742,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     }
     else if (inst->isReallocBaseCollectorMicroop()){
 
-        if (tc->Collector_Status !=
-                  ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
+        if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
             panic("AP_REALLOC_BASE_COLLECT: Invalid Status!");
 
             uint64_t _pid_num  = cpu->readArchIntReg(X86ISA::INTREG_R16, tid);
@@ -1770,6 +1766,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             tc->num_of_allocations++;
             tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
 
+            assert(0);
     }
   }
 
@@ -1798,8 +1795,8 @@ DefaultCommit<Impl>::CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &he
 
   // srcReg[2] in store microops is the register that
   //we want to write its value to mem
-  uint64_t  dataRegContent =
-                    head_inst->readIntRegOperand(head_inst->staticInst.get(),2); // src(2) is the data register
+  uint64_t  dataRegContent = 
+            head_inst->readIntRegOperand(head_inst->staticInst.get(),2); // src(2) is the data register
 
   DPRINTF(TypeTracker, "CommitUpdateAliasTableUsingPointerTracker: Inst[%lli]: Updating Alias[%x] = %d (spilled ptr=%x)\n", head_inst->seqNum, head_inst->effAddr, head_inst->dyn_pid, dataRegContent);
   // first call updatePIDWithTypeTracker to make sure we have the latest PID from type tracker
