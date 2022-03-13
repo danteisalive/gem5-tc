@@ -118,6 +118,7 @@ class PointerDependencyGraph
     void doUpdateForNoneLoadMicroops(DynInstPtr& inst);
     void updatePointerTrackerForStoreMicroop(DynInstPtr &inst);
     void updatePointerTrackerForAddMicroop(DynInstPtr &inst, ThreadContext* tc);
+    void updatePointerTrackerForSubMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForLeaMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForAPBaseCollectorMicroops(DynInstPtr &inst, ThreadContext* tc);
     void updateBoundsCheckMicroop(DynInstPtr &inst);

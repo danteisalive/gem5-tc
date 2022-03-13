@@ -2478,6 +2478,78 @@ PointerDependencyGraph<Impl>::doUpdateForNoneLoadMicroops(DynInstPtr& inst)
 
 template <class Impl>
 void
+PointerDependencyGraph<Impl>::updatePointerTrackerForSubMicroop(DynInstPtr &inst, ThreadContext* tc)
+{
+
+
+    assert(inst->numIntDestRegs() == 1 && "Invalid number of dest regs!\n");
+    TheISA::RegOp * inst_regop = (TheISA::RegOp * )inst->staticInst.get(); 
+    const uint8_t dataSize = inst_regop->dataSize;
+    assert(dataSize == 8 || dataSize == 4 || dataSize == 2 || dataSize == 1);
+    
+    // no need to update this add microops as they should return PID(0)!
+    if (dataSize == 4 || dataSize == 2 || dataSize == 1) return;
+
+    X86ISAInst::Sub * inst_sub = dynamic_cast<X86ISAInst::Sub*>(inst->staticInst.get()); 
+    X86ISAInst::SubBig * inst_sub_big = dynamic_cast<X86ISAInst::SubBig*>(inst->staticInst.get()); 
+    
+    X86ISAInst::SubFlags * inst_sub_flags = dynamic_cast<X86ISAInst::SubFlags*>(inst->staticInst.get());
+    X86ISAInst::SubFlagsBig * inst_sub_flags_big = dynamic_cast<X86ISAInst::SubFlagsBig*>(inst->staticInst.get());
+
+    assert((inst_sub != nullptr || inst_sub_big != nullptr ||
+            inst_sub_flags != nullptr || inst_sub_flags_big != nullptr) 
+            && "Found an sub inst that is not Sub/SubBig or SubFlags/SubFlagsBig!\n");
+
+
+    X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+
+    uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;
+    uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;
+    uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); dest = dest;
+
+       
+    DPRINTF(PointerDepGraph, "Sub Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+            inst->seqNum,
+            inst->pcState(), 
+            inst->staticInst->disassemble(inst->pcState().instAddr()),
+            inst->dyn_pid,
+            inst->staticInst->getStaticPointerID());
+
+
+    // read the data
+    uint64_t  dataRegContent = inst->readDestReg(inst->staticInst.get(), 0); 
+    
+    // this is logically equal to a comparison
+    TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForAddMicroop:: Checking Alias for dataRegContent[%s]=%x=%s\n", 
+                            TheISA::IntRegIndexStr(dest), dataRegContent, _pid);
+
+    // our assumption is that all the add instructions always transfer thier sources to thier 
+    // destinations. Sometimes this is not true and the result is PID(0) although the sources are PID(n)
+    // in this case we need to update the pointer tracker 
+    if (_pid == TheISA::PointerID(0) && inst->dyn_pid != _pid)
+    {
+        DPRINTF(PointerDepGraph, "updatePointerTrackerForAddMicroop:: Update is needed as Sub microop is not synced! inst->dyn_pid%s != %s\n", 
+                            inst->dyn_pid, _pid);
+        inst->dyn_pid = _pid;
+        inst->staticInst->setStaticPointerID(_pid);  
+        doUpdateForNoneLoadMicroops(inst);  
+    }
+
+    DPRINTF(PointerDepGraph, "Updated PID for Sub Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
+                inst->seqNum,
+                inst->pcState(), 
+                inst->staticInst->disassemble(inst->pcState().instAddr()),
+                inst->dyn_pid,
+                inst->staticInst->getStaticPointerID()); 
+            
+            
+
+}
+
+template <class Impl>
+void
 PointerDependencyGraph<Impl>::updatePointerTrackerForAddMicroop(DynInstPtr &inst, ThreadContext* tc)
 {
 
