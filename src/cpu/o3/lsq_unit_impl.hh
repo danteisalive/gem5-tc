@@ -1522,6 +1522,8 @@ LSQUnit<Impl>::mispredictedPID(ThreadID tid, DynInstPtr &inst)
    if (inst->isMicroopInjected()) return false;
    if (inst->isBoundsCheckMicroop()) return false;
 
+   if (!inst->isTypeTracked()) return false;
+
    // datasize should be 8 bytes othersiwe it's not a base address
    if (si->getDataSize() != 8) return false;
 
