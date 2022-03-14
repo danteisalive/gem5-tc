@@ -1751,17 +1751,12 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
             TheISA::IntRegIndexStr(src1), 
             FetchArchRegsPid[src1]);
 
-    // TheISA::PointerID _pid = TheISA::PointerID(0);
-    // if (inst_sub_flags != nullptr || inst_sub_flags_big != nullptr)
-    // {
-    //     // this is for SubFlag/SubFlagBig microops
-    //     _pid = TheISA::PointerID(0);
-    // }
-    // else 
-    // {
-        // this is for Sub/SubBig microops
-    TheISA::PointerID _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
-    // }
+    TheISA::PointerID _pid = TheISA::PointerID(0);
+
+    // if both have equal PID, then the result for sure is PID(0)
+    if (FetchArchRegsPid[src0] != FetchArchRegsPid[src1])
+        _pid = (FetchArchRegsPid[src0] != TheISA::PointerID(0)) ?  FetchArchRegsPid[src0] : FetchArchRegsPid[src1];
+    
 
     FetchArchRegsPid[dest] = _pid;
 
