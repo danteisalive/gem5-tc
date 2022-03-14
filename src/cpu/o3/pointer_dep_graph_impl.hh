@@ -1173,11 +1173,12 @@ PointerDependencyGraph<Impl>::TransferMovMicroops(DynInstPtr &inst, bool track, 
             // this is at commit to make sure everything is right! Don't do anything!
             if (sanity)
             {
-                // if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
-                //     CommitArchRegsPid[src1] != TheISA::PointerID(0))
-                // {
-                //     assert(false && "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
-                // }
+                if ((dataSize == 4 || dataSize == 2 || dataSize == 1) && 
+                    CommitArchRegsPid[src1] != TheISA::PointerID(0))
+                {
+                    assert(inst->dyn_pid == TheISA::PointerID(0) && 
+                          "Found a 1/2/4 bytes Mov Inst with non-zero PID!\n");
+                }
                 return;
             }
 

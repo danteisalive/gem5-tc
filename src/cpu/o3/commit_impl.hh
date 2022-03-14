@@ -72,6 +72,7 @@
 #include "debug/TypeTracker.hh"
 #include "debug/Allocator.hh"
 #include "debug/AliasCache.hh"
+#include "debug/PointerDepGraph.hh"
 
 using namespace std;
 
@@ -1338,8 +1339,13 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
         {
             cpu->PointerDepGraph.updatePIDWithTypeTracker(head_inst, tc);
         }
+        
+        DPRINTF(AliasCache, "Stack Top: Inst: %x CPU: %x\n", 
+                findCurrentStackTop(head_inst), cpu->readArchIntReg(X86ISA::INTREG_RSP, tid));
 
-        cpu->ExeAliasCache->RemoveStackAliases(cpu->readArchIntReg(X86ISA::INTREG_RSP,tid), tc);
+        Addr currStackTop = findCurrentStackTop(head_inst);
+        if (currStackTop != 0)
+            cpu->ExeAliasCache->RemoveStackAliases(currStackTop, tc);
 
     }
 
@@ -2066,6 +2072,34 @@ DefaultCommit<Impl>::oldestReady()
     }
 }
 
+template<class Impl>
+Addr
+DefaultCommit<Impl>::findCurrentStackTop(DynInstPtr& head_inst)
+{
 
+    for (size_t i = 0; i < head_inst->staticInst->numDestRegs(); i++) 
+    {
+        if (head_inst->destRegIdx(i).isIntReg())
+        {
+            // X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
+            // uint16_t dest_reg_idx = x86_inst->getUnflattenRegIndex(inst->staticInst->destRegIdx(i)); 
+            
+            uint16_t dest_reg_idx = head_inst->staticInst->destRegIdx(i).index();
+            if (dest_reg_idx != X86ISA::INTREG_RSP) continue;
+            assert(head_inst->numIntDestRegs() == 1 && "findCurrentStackTop:: Invalid number of dest regs!\n");
+            // read the data
+            uint64_t  dataRegContent = head_inst->readDestReg(head_inst->staticInst.get(), 0); 
+            
+            DPRINTF(AliasCache, "findCurrentStackTop: [SeqNum = %d] Stack Top: %x\n",
+                    head_inst->seqNum, dataRegContent);
+            
+            return dataRegContent;
+
+
+        }
+    }
+
+    return 0;
+}
 
 #endif//__CPU_O3_COMMIT_IMPL_HH__

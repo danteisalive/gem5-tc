@@ -322,6 +322,7 @@ class DefaultCommit
     void CommitUpdateAliasTableInCommit(ThreadID tid, DynInstPtr &head_inst);
     void updateStackAliasTable(ThreadID tid, DynInstPtr &head_inst);
     void collector(ThreadID tid, DynInstPtr &inst);
+    Addr findCurrentStackTop(DynInstPtr& head_inst);
     /** Gets the thread to commit, based on the SMT policy. */
     ThreadID getCommittingThread();
 
