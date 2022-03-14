@@ -145,7 +145,7 @@ class FullO3CPU : public BaseO3CPU
     /** Overall CPU status. */
     Status _status;
 
-    // PointerDependencyGraph<Impl> PointerDepGraph;
+
 
   private:
 
@@ -278,7 +278,7 @@ class FullO3CPU : public BaseO3CPU
 
     /** Register probe points. */
     void regProbePoints() override;
-
+    void updateCPUCollectorStatus(ThreadID tid, InstSeqNum squashedSeqNum);
     void demapPage(Addr vaddr, uint64_t asn)
     {
         this->itb->demapPage(vaddr, asn);

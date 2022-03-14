@@ -77,6 +77,7 @@
 #include "sim/system.hh"
 #include "cpu/o3/isa_specific.hh"
 #include "debug/TypeCheck.hh"
+#include "debug/Allocator.hh"
 
 using namespace std;
 
@@ -976,6 +977,8 @@ DefaultFetch<Impl>::squash(const TheISA::PCState &newPC,
     doSquash(newPC, squashInst, tid, squashDueToMispredictedPID);
     // Tell the CPU to remove any instructions that are not in the ROB.
     cpu->removeInstsNotInROB(tid, _MissPIDSquashType);
+
+
 }
 
 template <class Impl>
@@ -1208,6 +1211,11 @@ DefaultFetch<Impl>::checkSignalsAndUpdate(ThreadID tid)
 
         fetchStatus[tid] = Running;
 
+        // after this we can put cpu collector into a consistent state
+        if (tc->enableCapability)
+        {
+            cpu->updateCPUCollectorStatus(tid, fromCommit->commitInfo[tid].squashInst);
+        }
         return true;
     }
 
@@ -1281,7 +1289,10 @@ DefaultFetch<Impl>::capabilityCheck(TheISA::PCState& thisPC ,
         
         ThreadContext * tc = cpu->tcBase(tid);
         auto syms_it = (tc->syms_cache).find(thisPC.instAddr());
-        if (syms_it != (tc->syms_cache).end()){
+        if (syms_it != (tc->syms_cache).end())
+        {
+            DPRINTF(Allocator, "AP Point Detected: Front-End Collector State: %d Back-End Collector State: %d\n", 
+                    tc->forntend_collector_status, tc->Collector_Status);
             si->injectMicroops(tc, thisPC, syms_it->second, TheISA::PointerID(0));
         }
         else {
@@ -1576,35 +1587,69 @@ DefaultFetch<Impl>::fetch(bool &status_change)
             instruction->macroOp = curMacroop;
 
 
-            if (tc->enableCapability &&
-                TrackAlias(tc, thisPC.pc()))
+            if (tc->enableCapability && TrackAlias(tc, thisPC.pc()))
             {
-                if (instruction->isMallocBaseCollectorMicroop() ||
-                    instruction->isCallocBaseCollectorMicroop() )
+                if (instruction->isMallocBaseCollectorMicroop())
                 {
                     uint64_t _PID = cpu->readArchIntReg(X86ISA::INTREG_R16, instruction->threadNumber);
                     uint64_t _TID = thisPC.pc();
                     instruction->dyn_pid = TheISA::PointerID(_PID, _TID);
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE,
+                    //         "Malloc Base: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
                 }
-                else if (instruction->isReallocSizeCollectorMicroop())
+                else if (instruction->isCallocBaseCollectorMicroop())
                 {
-                    // we will get the PID and TID from pointer tracker like address sanitizer
+                    uint64_t _PID = cpu->readArchIntReg(X86ISA::INTREG_R16, instruction->threadNumber);
+                    uint64_t _TID = thisPC.pc();
+                    instruction->dyn_pid = TheISA::PointerID(_PID, _TID);
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE,
+                    //         "Calloc Base: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
                 }
                 else if (instruction->isReallocBaseCollectorMicroop())
                 {
                     uint64_t _PID = cpu->readArchIntReg(X86ISA::INTREG_R16, instruction->threadNumber);
                     uint64_t _TID = thisPC.pc();
                     instruction->dyn_pid = TheISA::PointerID(_PID, _TID);
-                }
-                else if (instruction->isFreeCallMicroop())
-                {
-                    // instruction->dyn_pid = TheISA::PointerID(0);
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE,
+                    //     "Realloc Base: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
                 }
                 else if (instruction->isFreeRetMicroop())
                 {
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::FREE_CALL,
+                    //     "Free Ret: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
                     instruction->dyn_pid = TheISA::PointerID(0);
                 }
-
+                else if (instruction->isCallocSizeCollectorMicroop())
+                {
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::NONE,
+                    //     "Calloc Size: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+                    // we will get the PID and TID from pointer tracker like address sanitizer
+                }
+                else if (instruction->isMallocSizeCollectorMicroop())
+                {
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::NONE,
+                    //     "Malloc Size: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+                    // we will get the PID and TID from pointer tracker like address sanitizer
+                }
+                else if (instruction->isReallocSizeCollectorMicroop())
+                {
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::NONE,
+                    //     "Realloc Size: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+                    // we will get the PID and TID from pointer tracker like address sanitizer
+                }
+                else if (instruction->isFreeCallMicroop())
+                {
+                    // panic_if(tc->forntend_collector_status != ThreadContext::COLLECTOR_STATUS::NONE,
+                    //     "Free Call: Invalid collector status at front-end! Prev. Status: %x\n", tc->forntend_collector_status);
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::FREE_CALL;
+                }
 
                 cpu->PointerDepGraph.insert(instruction);
             }

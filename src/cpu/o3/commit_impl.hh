@@ -1624,8 +1624,8 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
     else if (inst->isFreeRetMicroop())
     {
 
-        if (tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::FREE_CALL)
-            panic("AP_FREE_RET: Invalid Status!");
+        panic_if(tc->Collector_Status != ThreadContext::COLLECTOR_STATUS::FREE_CALL, 
+                "AP_FREE_RET: Invalid Status! Prev Status: %s\n", tc->Collector_Status);
 
         //check whether we have the cap for this AP or not
         TheISA::PointerID _pid = TheISA::PointerID(0);

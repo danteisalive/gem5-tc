@@ -147,6 +147,7 @@ class ThreadContext
     ShadowMemoryAliasTable                      ShadowMemory;
     TheISA::LRUPIDCache                         LRUPidCache{64};
     COLLECTOR_STATUS                            Collector_Status;
+    COLLECTOR_STATUS                            forntend_collector_status;
 
     WordFM*                                     FunctionSymbols = NULL;
     WordFM*                                     FunctionsToIgnore = NULL;

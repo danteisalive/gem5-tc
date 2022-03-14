@@ -67,6 +67,7 @@
 #include "sim/process.hh"
 #include "sim/stat_control.hh"
 #include "sim/system.hh"
+#include "debug/Allocator.hh"
 
 #if THE_ISA == ALPHA_ISA
 #include "arch/alpha/osfpal.hh"
@@ -421,6 +422,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         NumOfExecutedBoundsCheck = 0; numOfCommitedMemRefs = 0;
 
 
+        o3_tc->forntend_collector_status = ThreadContext::NONE;
 
          //symtab
          Process *process = o3_tc->getProcessPtr();
@@ -1992,6 +1994,67 @@ FullO3CPU<Impl>::addInst(DynInstPtr &inst)
     return --(instList.end());
 }
 
+
+template <class Impl>
+void
+FullO3CPU<Impl>::updateCPUCollectorStatus(ThreadID tid, InstSeqNum squashedSeqNum)
+{
+
+    if (!this->threadContexts[tid]->enableCapability) return;
+
+    DPRINTF(Allocator, "Collectors Status Before Squashing: Front-End:%x Back-End:%x\n",
+            this->threadContexts[tid]->forntend_collector_status, this->threadContexts[tid]->Collector_Status);
+    // first get the latest commit stage collector status
+    this->threadContexts[tid]->forntend_collector_status = this->threadContexts[tid]->Collector_Status;
+
+    
+    // now go through all the instructions in-flight and update the cpu_collector_status
+    ListIt inst_list_it = instList.begin();
+    while (inst_list_it != instList.end()) 
+    {
+        if ((*inst_list_it)->seqNum > squashedSeqNum) break;
+
+        DPRINTF(Allocator, "Instruction: PC:%#x [sn:%lli] Issued:%i Squashed:%i\n",
+                (*inst_list_it)->instAddr(),
+                (*inst_list_it)->seqNum, 
+                (*inst_list_it)->isIssued(),
+                (*inst_list_it)->isSquashed());
+
+        assert(!(*inst_list_it)->isSquashed() && 
+                "Updating Front-End collector with an squashed instruction!\n");
+
+        if ((*inst_list_it)->isMallocBaseCollectorMicroop() ||
+            (*inst_list_it)->isCallocBaseCollectorMicroop() || 
+            (*inst_list_it)->isReallocBaseCollectorMicroop() ||
+            (*inst_list_it)->isFreeRetMicroop())
+        {
+            this->threadContexts[tid]->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+        }
+        else if ((*inst_list_it)->isCallocSizeCollectorMicroop())
+        {
+            this->threadContexts[tid]->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+        }
+        else if ((*inst_list_it)->isMallocSizeCollectorMicroop())
+        {
+            this->threadContexts[tid]->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+        }
+        else if ((*inst_list_it)->isReallocSizeCollectorMicroop())
+        {
+            this->threadContexts[tid]->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+        }
+        else if ((*inst_list_it)->isFreeCallMicroop())
+        {
+            this->threadContexts[tid]->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::FREE_CALL;
+        }
+
+        inst_list_it++;
+        
+    }
+    DPRINTF(Allocator, "Collectors Status After Squashing: Front-End:%x Back-End:%x\n",
+            this->threadContexts[tid]->forntend_collector_status, this->threadContexts[tid]->Collector_Status);
+}
+
+
 template <class Impl>
 void
 FullO3CPU<Impl>::instDone(ThreadID tid, DynInstPtr &inst)
@@ -2240,6 +2303,8 @@ FullO3CPU<Impl>::squashInstIt(const ListIt &instIt, ThreadID tid,
         removeList.push(instIt);
 
     }
+
+
 }
 
 template <class Impl>

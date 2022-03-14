@@ -321,32 +321,46 @@ MacroopBase::injectMicroops(ThreadContext * _tc,
 {
 
 
-    if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT){
+    if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_BASE_COLLECT && 
+        _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE)
+    {
         injectAPMallocBaseCollector(_tc, nextPC);
-      }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT){
+    }
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_MALLOC_SIZE_COLLECT &&
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::NONE)
+    {
         injectAPMallocSizeCollector(_tc, nextPC);
-      }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL){
+    }
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_CALL && 
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::NONE)
+    {
         injectAPFreeCall(_tc, nextPC);
-      }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_RET){
+    }
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_FREE_RET && 
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::FREE_CALL)
+    {   
         injectAPFreeRet(_tc, nextPC);
-      }
+    }
     else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_BOUNDS_INJECT){
         injectBoundsCheck(nextPC, _pid);
       }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT){
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_BASE_COLLECT && 
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE)
+    {
         injectAPCallocBaseCollector(_tc, nextPC);
-      }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT){
+    }
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_CALLOC_SIZE_COLLECT &&
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::NONE)
+    {
         injectAPCallocSizeCollector(_tc, nextPC);
-      }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT)
+    }
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_BASE_COLLECT && 
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE)
     {
         injectAPReallocBaseCollector(_tc, nextPC);
     }
-    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT)
+    else if (_sym.GetCheckType() == TheISA::TyCHEAllocationPoint::CheckType::AP_REALLOC_SIZE_COLLECT && 
+            _tc->forntend_collector_status == ThreadContext::COLLECTOR_STATUS::NONE)
     {
         injectAPReallocSizeCollector(_tc, nextPC);
     }
