@@ -443,6 +443,8 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         readVirtualTable(seglist[seglist.size()-1].c_str(), o3_tc);
         readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), o3_tc);
         
+        readFunctionObjects(seglist[seglist.size()-1].c_str(), "stack_objects.hash", o3_tc);
+
         if (o3_tc->enableCapability) 
             assert(o3_tc->symbolsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
 

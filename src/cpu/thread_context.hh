@@ -61,6 +61,7 @@
 #include "mem/page_table.hh"
 #include "sim/process.hh"
 #include "arch/TypeNode.hh"
+//#include "arch/stacktrace.hh"
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
 // DTB pointers.
@@ -70,6 +71,7 @@ namespace TheISA
     class TypeMetadataInfo;
     class TypeEntryInfo;
     class AllocationPointMeta;
+    class StackObject;
 }
 class BaseCPU;
 class BaseTLB;
@@ -123,10 +125,11 @@ class ThreadContext
   public:
 
     //Addr here is the AP/DP point address
-    typedef std::map<Addr, TyCHEAllocationPoint>       SymbolCache;
+    typedef std::map<Addr, TyCHEAllocationPoint>                SymbolCache;
     typedef std::map<Addr, std::map<Addr, TheISA::PointerID>>   ShadowMemoryAliasTable;
-    typedef std::map<Addr, TheISA::AllocationPointMeta>          AllocationPointMetaTable;
+    typedef std::map<Addr, TheISA::AllocationPointMeta>         AllocationPointMetaTable;
     typedef std::map<Addr, std::vector<std::string>>            VirtualTables; 
+    typedef std::map<Addr, TheISA::FunctionObject>              FunctionObjects;
 
 
     enum COLLECTOR_STATUS
@@ -162,6 +165,7 @@ class ThreadContext
     std::vector<TypeMetadataInfo>       TypeMetaDataBuffer;
     AllocationPointMetaTable            AllocationPointMetaBuffer;
     VirtualTables                       VirtualTablesBuffer;
+    FunctionObjects                     FunctionObjectsBuffer;
 
 
     enum Status

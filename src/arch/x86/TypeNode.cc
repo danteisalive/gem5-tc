@@ -306,6 +306,7 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
     return true;
 }
 
+
 bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc)
 {
     Elf         *elf;
@@ -643,7 +644,183 @@ bool readVirtualTable(const char* file_name, ThreadContext *tc)
     return false;
 }
 
+bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_file_name, ThreadContext *tc)
+{
 
+    Elf         *elf;
+    Elf_Scn     *scn = NULL;
+    GElf_Shdr   shdr;
+    Elf_Data    *data;
+    int         fd, ii, count;
+    Elf64_Ehdr	*ehdr = NULL;
+    std::map<int, Elf64_Word>  shs_flags;
+    elf_version(EV_CURRENT);
+
+    fd = open(exec_file_name, O_RDONLY);
+    panic_if(fd == -1, "readFunctionObjects: Can't open file: %s! Error Number % d\n", std::string(exec_file_name), errno);
+    elf = elf_begin(fd, ELF_C_READ, NULL);
+    //   std::cout << "readFunctionObjects : " << std::string(exec_file_name) << std::endl;
+    assert (elf != NULL);
+
+    int i = 0;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        gelf_getshdr(scn, &shdr);
+        shs_flags[i] = shdr.sh_flags;
+        //printf("sh_number: %d sh_flags: %lu\n", i, shdr.sh_flags);
+        i++;
+    }
+
+    
+    ehdr = elf64_getehdr(elf);
+    assert (elf != NULL);
+    if (shs_flags.size() > ehdr->e_shnum){
+        panic("invalid number of section headers!");
+    }
+
+
+    scn = NULL;
+    while ((scn = elf_nextscn(elf, scn)) != NULL) {
+        gelf_getshdr(scn, &shdr);
+        if (shdr.sh_type == SHT_SYMTAB) {
+            /* found a symbol table, go print it. */
+            break;
+        }
+    }
+
+    if (scn == NULL){
+        panic("didn't found a symbol table!");
+        return false;
+    }
+
+
+    data = elf_getdata(scn, NULL);
+    count = shdr.sh_size / shdr.sh_entsize;
+
+    std::map<Elf64_Addr, std::string> sym_names;
+    std::map<Elf64_Addr, unsigned char> sym_infos;
+    std::map<Elf64_Addr, Elf64_Xword> sym_sizes;
+    std::map<Elf64_Addr, Elf64_Half> sym_shndxs;
+
+
+    /* print the symbol names */
+    for (ii = 0; ii < count; ++ii) 
+    {
+        GElf_Sym sym;
+        gelf_getsym(data, ii, &sym);
+
+        // read all the symbols
+        if (sym.st_value != 0)
+        {
+
+            const char* pStr = elf_strptr(elf, shdr.sh_link, sym.st_name);
+            std::string s1(pStr);
+
+            sym_infos[sym.st_value]    = sym.st_info;
+            sym_names[sym.st_value]    = s1;
+            sym_shndxs[sym.st_value]   = sym.st_shndx;
+            sym_sizes[sym.st_value]    = sym.st_size;
+
+            DPRINTF(TypeMetadata, "VTable Symbol Addr: %x Mangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
+                        sym.st_value, s1, sym.st_size, sym.st_info, sym.st_shndx);
+
+            sym_names[sym.st_value] = s1;
+            sym_infos[sym.st_value] = sym.st_info;
+            sym_sizes[sym.st_value] = sym.st_size;
+            sym_shndxs[sym.st_value] = sym.st_shndx;
+        }
+
+    }
+    elf_end(elf);
+    close(fd);
+
+
+    DPRINTF(TypeMetadata, "\n\n");
+
+    std::ifstream input(stack_objects_file_name);
+    
+    std::string line;
+    std::map<int, StackSlot> stackSlots;
+    while (std::getline(input, line))
+    {
+        std::istringstream iss(line);
+        std::string key, answer;
+        iss >> key;
+
+        std::string functionName = "";
+        int numberOfObjectsOnStack = 0;
+        int numberOfObjects = 0;
+        // DPRINTF(TypeMetadata, "KEY: %s\n", key);
+        // DPRINTF(TypeMetadata, "RAW: %s\n", line);
+        
+        if (key == "FN") 
+        {
+            answer = line.substr(3, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            functionName = answer;
+        }
+        else if (key == "N")
+        {
+            answer = line.substr(2, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            numberOfObjects = numberOfObjectsOnStack = std::stoi(answer);
+            assert(numberOfObjectsOnStack >= 0 && "numberOfObjectsOnStack < 0\n");
+        }
+        else if (key == "OBJ")
+        {
+            answer = line.substr(4, line.size() - 1);
+            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            assert(numberOfObjectsOnStack >= 1 && "numberOfObjectsOnStack <= 0\n");
+            /*
+            int fi
+            unsigned long long size (0, ~ULL, > 0)
+            bool isSpillSlot
+            uint64_t Alignment
+            bool fixed
+            int offset
+            */
+            int fi;
+            unsigned long long size;
+            int isSpillSlot;
+            uint64_t alignment;
+            int fixed;
+            int offset;
+
+            std::stringstream ss(answer);
+            ss >> fi >> size >> isSpillSlot >> alignment >> fixed >> offset;
+            assert((isSpillSlot == 0 || isSpillSlot == 1) && "wrong value for isSpillSlot!\n");
+            assert((fixed == 0 || fixed == 1) && "wrong value for fixed!\n");
+            stackSlots[offset] = StackSlot(fi, 
+                                        size, 
+                                        isSpillSlot == 1 ? true : false, 
+                                        alignment, 
+                                        fixed == 1 ? true : false, 
+                                        offset
+                                        );
+
+            numberOfObjectsOnStack--;
+
+            // insert it
+            if (numberOfObjectsOnStack == 0)
+            {
+                assert(functionName != "" && "Empty Function Name!\n");
+
+                auto it = sym_names.begin();
+                for ( ; it != sym_names.end(); it++)
+                {
+                    if (it->second == functionName)
+                        break;
+                }
+                assert(it != sym_names.end() && "");
+                tc->FunctionObjectsBuffer[it->first] = StackObject(functionName, numberOfObjects, stackSlots);
+                stackSlots.clear();
+            }
+        }
+    }
+
+
+    return true;
+
+}
 
 
 }

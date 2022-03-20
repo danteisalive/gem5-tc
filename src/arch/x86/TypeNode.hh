@@ -490,6 +490,7 @@ class TypeEntryInfo
         uint64_t GetOffset() {return Offset;}
 };
 
+
 class TypeMetadataInfo 
 {
     private:
@@ -1029,10 +1030,210 @@ class PointerID
     };
 
 
+class StackSlot
+{
+    private:
+        bool Valid;
+        int Fi;
+        unsigned long long Size;
+        bool IsSpillSlot;
+        uint64_t Alignment;
+        bool Fixed;
+        int Offset;
+        TypeEntryInfo TypeInfo;
+    
+    public:
+        StackSlot(
+            int _Fi,
+            unsigned long long _Size,
+            bool _IsSpillSlot,
+            uint64_t _Alignment,
+            bool _Fixed,
+            int _Offset,
+            TypeEntryInfo _TypeInfo
+        )
+        {
+            Valid       = true;
+            Fi          = _Fi          ;
+            Size        = _Size        ;
+            IsSpillSlot = _IsSpillSlot ;
+            Alignment   = _Alignment   ;
+            Fixed       = _Fixed       ;
+            Offset      = _Offset      ;
+            TypeInfo    = _TypeInfo    ;
+        }
+
+        StackSlot()
+        {
+            Valid = false;
+        }
+
+        
+
+        StackSlot(const StackSlot& ss)
+        {
+            this->Valid       = ss.Valid     ;
+            this->Fi          = ss.Fi          ;
+            this->Size        = ss.Size        ;
+            this->IsSpillSlot = ss.IsSpillSlot ;
+            this->Alignment   = ss.Alignment   ;
+            this->Fixed       = ss.Fixed       ;
+            this->Offset      = ss.Offset      ;  
+            this->TypeInfo    = ss.TypeInfo    ;          
+        }
+
+        StackSlot& operator= (const StackSlot& ss)
+        {
+            if (this == &ss)
+                return (*this);
+            
+            this->Valid       = ss.Valid     ;
+            this->Fi          = ss.Fi          ;
+            this->Size        = ss.Size        ;
+            this->IsSpillSlot = ss.IsSpillSlot ;
+            this->Alignment   = ss.Alignment   ;
+            this->Fixed       = ss.Fixed       ;
+            this->Offset      = ss.Offset      ; 
+            this->TypeInfo    = ss.TypeInfo    ;   
+
+            return (*this);
+        }
+
+
+
+        friend std::ostream& operator << (std::ostream& out, const StackSlot& ss )
+        {
+            assert(ss.Valid && "Printing an invalid StackSlot\n");
+
+                    ccprintf(out, "StackSlot:"
+                                "\tFi = %d"
+                                "\tSize = %llu"
+                                "\tIsSpillSlot = %d"
+                                "\tAlignment = %llu"
+                                "\tFixed = %d" 
+                                "\tOffset = %d", 
+                                "\tTypeInfo = %s\n", 
+                                ss.Fi,         
+                                ss.Size,       
+                                ss.IsSpillSlot,
+                                ss.Alignment,
+                                ss.Fixed,      
+                                ss.Offset,
+                                ss.TypeInfo       
+                            );
+                    return out;
+        }
+
+
+};
+
+class FunctionObject
+{
+    private:
+        bool        Valid;
+        std::string FunctionName;
+        int NumberOfObjectsOnStack;
+        //     OFFSET 
+        std::map<int, StackSlot> StackSlots;
+        //      REG ID   TYPE INFO
+        std::map<int, TypeEntryInfo> ArgumentSlots;
+        TypeEntryInfo                ReturnType;
+
+    public:
+        FunctionObject(
+            std::string _FunctionName,
+            int _NumberOfObjectsOnStack,
+            std::map<int, StackSlot> _StackSlots,
+            std::map<int, TypeEntryInfo> _ArgumentSlots,
+            TypeEntryInfo                _ReturnType
+        )
+        {
+            Valid = true;
+            NumberOfObjectsOnStack = _NumberOfObjectsOnStack;
+            FunctionName = _FunctionName;
+            StackSlots = _StackSlots;
+            ArgumentSlots = _ArgumentSlots;
+            ReturnType = _ReturnType;
+        }
+
+        FunctionObject()
+        {
+            Valid = false;
+            FunctionName = "";
+        }
+
+        
+
+        FunctionObject(const FunctionObject& so)
+        {
+            this->Valid = so.Valid;
+            this->FunctionName = so.FunctionName;
+            this->StackSlots = so.StackSlots;
+            this->NumberOfObjectsOnStack = so.NumberOfObjectsOnStack;
+            this->ReturnType = so.ReturnType;
+            this->ArgumentSlots = so.ArgumentSlots;
+        }
+
+        FunctionObject& operator= (const FunctionObject& so)
+        {
+            if (this == &so)
+                return (*this);
+            
+            this->Valid = so.Valid;
+            this->FunctionName = so.FunctionName;
+            this->StackSlots = so.StackSlots;
+            this->NumberOfObjectsOnStack = so.NumberOfObjectsOnStack;
+            this->ReturnType = so.ReturnType;
+            this->ArgumentSlots = so.ArgumentSlots;
+            return (*this);
+        }
+
+
+
+        friend std::ostream& operator << (std::ostream& out, const FunctionObject& so )
+        {
+            assert(so.Valid && "Printing an invalid FunctionObject\n");
+
+                    ccprintf(out, "FunctionObject:" 
+                                "\n\tNumber of Objects On Stack = %d"
+                                "\n\tFunction Name = %s\n", 
+                                so.NumberOfObjectsOnStack,
+                                so.FunctionName
+                                );
+                    
+                    for (auto const& arg : so.ArgumentSlots)
+                    {
+                        ccprintf(out, "Arg[%s] = %s", 
+                                    TheISA::IntRegIndexStr(arg.first),
+                                    arg.second
+                                    );
+                    }
+                    
+                    ccprintf(out, "\n");
+                    
+                    ccprintf(out, "Return Type = %s\n", so.ReturnType);
+
+                    for (auto const& slot : so.StackSlots)
+                    {
+                        ccprintf(out, "Offset[%d] = %s", 
+                                    slot.first,
+                                    slot.second
+                                    );
+                    }
+                    ccprintf(out, "\n");
+                    
+                    return out;
+        }
+
+};
+
+
+
 bool readVirtualTable(const char* file_name, ThreadContext *tc);  
 
 bool readAllocationPointsSymbols(const char* file_name, ThreadContext *tc);
 bool readTypeMetadata(const char* file_name, ThreadContext *tc);
+bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_file_name, ThreadContext *tc);
 
 
 }

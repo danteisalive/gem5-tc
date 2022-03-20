@@ -36,10 +36,10 @@
 #include "debug/Stack.hh"
 
 class ThreadContext;
+
 namespace X86ISA
 {
     class StackTrace;
-
     class ProcessInfo
     {
       private:
