@@ -449,6 +449,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             assert(o3_tc->symbolsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
 
         readTypeMetadata(o3_tc->symbolsFile.c_str(), o3_tc);
+        readTypeMetadata("stack_allocation_points.hash", o3_tc);
 
         DPRINTF(TypeMetadata, "DUMPING ALL THE METADATA INFORMATION\n");
         for (auto const &elem: o3_tc->VirtualTablesBuffer)

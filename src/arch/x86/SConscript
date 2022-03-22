@@ -87,6 +87,7 @@ if env['TARGET_ISA'] == 'x86':
     DebugFlag('Decoder', "Decoder debug output")
     DebugFlag('X86', "Generic X86 ISA debugging")
     DebugFlag('TypeMetadata', "Type Metadata for TyCHE")
+    DebugFlag('StackTypeMetadata', "Type Metadata for Function Objects")
 
     python_files = (
         '__init__.py',

@@ -720,7 +720,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
             sym_shndxs[sym.st_value]   = sym.st_shndx;
             sym_sizes[sym.st_value]    = sym.st_size;
 
-            DPRINTF(TypeMetadata, "VTable Symbol Addr: %x Mangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
+            DPRINTF(StackTypeMetadata, "VTable Symbol Addr: %x Mangled Symbol: %s Symbol Size: %d Symbol Info: 0x%x Symbol Shndx: %d\n", 
                         sym.st_value, s1, sym.st_size, sym.st_info, sym.st_shndx);
 
             sym_names[sym.st_value] = s1;
@@ -734,12 +734,13 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
     close(fd);
 
 
-    DPRINTF(TypeMetadata, "\n\n");
+    DPRINTF(StackTypeMetadata, "\n\n");
 
     std::ifstream input(stack_objects_file_name);
     
     std::string line;
-    std::map<int, StackSlot> stackSlots;
+    std::map<int, StackSlot>     stackSlots;
+    std::map<int, AllocationPointMeta> argumetSlots;
     while (std::getline(input, line))
     {
         std::istringstream iss(line);
@@ -747,73 +748,385 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
         iss >> key;
 
         std::string functionName = "";
+        int numberOfArguments = 0;
         int numberOfObjectsOnStack = 0;
-        int numberOfObjects = 0;
-        // DPRINTF(TypeMetadata, "KEY: %s\n", key);
-        // DPRINTF(TypeMetadata, "RAW: %s\n", line);
+        int numberOfReturnObject = 0;
+
+        /*
+        int fi
+        unsigned long long size (0, ~ULL, > 0)
+        bool isSpillSlot
+        uint64_t Alignment
+        bool fixed
+        int offset
+        */
+        int fi = INT_MIN;
+        unsigned long long size = UINT64_MAX;
+        int isSpillSlot = -1;
+        uint64_t alignment = UINT64_MAX;
+        int fixed = -1;
+        int offset = INT_MIN;
+        // DPRINTF(StackTypeMetadata, "KEY: %s\n", key);
+        // DPRINTF(StackTypeMetadata, "RAW: %s\n", line);
         
         if (key == "FN") 
         {
             answer = line.substr(3, line.size() - 1);
-            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
             functionName = answer;
         }
-        else if (key == "N")
+        else if (key == "NUM")
         {
-            answer = line.substr(2, line.size() - 1);
-            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
-            numberOfObjects = numberOfObjectsOnStack = std::stoi(answer);
+            answer = line.substr(4, line.size() - 1);
+            DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
+
+            // seperate the information by space
+            std::istringstream ss(answer);
+            std::string token;
+            std::vector<std::string> tokens;
+            while(std::getline(ss, token, ' ')) {
+                tokens.push_back(token);
+            }
+
+            if (tokens.size() != 14)
+            {
+                DPRINTF(StackTypeMetadata, "SYM: %s\n", answer);
+                for (size_t i = 0; i < tokens.size(); i++)
+                {
+                    DPRINTF(StackTypeMetadata, "Tokens[%d] = %s\n", i, tokens[i]);
+                }
+                
+                assert(tokens.size() == 3 && "Tokens size is not equal to 3!\n" );
+
+            }        
+            numberOfObjectsOnStack = std::stoi(tokens[0]);
             assert(numberOfObjectsOnStack >= 0 && "numberOfObjectsOnStack < 0\n");
+
+            numberOfArguments = std::stoi(tokens[1]);
+            assert(numberOfArguments >= 0 && "numberOfArguments < 0\n");
+
+            numberOfReturnObject = std::stoi(tokens[2]);
+            assert((numberOfReturnObject == 0 || numberOfReturnObject == 1) && 
+                    "(numberOfReturnObject != 0 && numberOfReturnObject != 1)\n");
         }
         else if (key == "OBJ")
         {
             answer = line.substr(4, line.size() - 1);
-            DPRINTF(TypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
             assert(numberOfObjectsOnStack >= 1 && "numberOfObjectsOnStack <= 0\n");
-            /*
-            int fi
-            unsigned long long size (0, ~ULL, > 0)
-            bool isSpillSlot
-            uint64_t Alignment
-            bool fixed
-            int offset
-            */
-            int fi;
-            unsigned long long size;
-            int isSpillSlot;
-            uint64_t alignment;
-            int fixed;
-            int offset;
+
 
             std::stringstream ss(answer);
             ss >> fi >> size >> isSpillSlot >> alignment >> fixed >> offset;
             assert((isSpillSlot == 0 || isSpillSlot == 1) && "wrong value for isSpillSlot!\n");
             assert((fixed == 0 || fixed == 1) && "wrong value for fixed!\n");
-            stackSlots[offset] = StackSlot(fi, 
+            
+        }
+        else if (key == "OBJECTMETA")
+        {
+            answer = line.substr(11, line.size() - 1);
+            DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
+
+            if (answer == "NOMETA")
+            {
+                stackSlots[offset] = StackSlot(fi, 
                                         size, 
                                         isSpillSlot == 1 ? true : false, 
                                         alignment, 
                                         fixed == 1 ? true : false, 
-                                        offset
+                                        offset,
+                                        AllocationPointMeta()
                                         );
-
-            numberOfObjectsOnStack--;
-
-            // insert it
-            if (numberOfObjectsOnStack == 0)
+                numberOfObjectsOnStack--;
+            }
+            else
             {
-                assert(functionName != "" && "Empty Function Name!\n");
 
+                // seperate the information by #
+                std::istringstream ss(answer);
+                std::string token;
+                std::vector<std::string> tokens;
+                while(std::getline(ss, token, '#')) {
+                    tokens.push_back(token);
+                }
+
+                if (tokens.size() != 14)
+                {
+                    DPRINTF(StackTypeMetadata, "SYM: %s\n", answer);
+                    for (size_t i = 0; i < tokens.size(); i++)
+                    {
+
+                        DPRINTF(StackTypeMetadata, "Tokens[%d] = %s\n", i, tokens[i]);
+                    }
+                    
+                    assert(tokens.size() == 14 && "Tokens size is not equal to 14!\n" );
+
+                }
+
+                DPRINTF(StackTypeMetadata, "Tokens[0]: %s "
+                                    "Tokens[1]: %s " 
+                                    "Tokens[2]: %s "
+                                    "Tokens[3]: %s "
+                                    "Tokens[4]: %s "
+                                    "Tokens[5]: %s "
+                                    "Tokens[6]: %s "
+                                    "Tokens[7]: %s "
+                                    "Tokens[8]: %s "
+                                    "Tokens[9]: %s "
+                                    "Tokens[10]: %s "
+                                    "Tokens[11]: %s "
+                                    "Tokens[12]: %s "
+                                    "Tokens[13]: %s\n",
+                                    tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5],
+                                    tokens[6],tokens[7],tokens[8],tokens[9],tokens[10],tokens[11],
+                                    tokens[12],tokens[13]);
+
+                /*              
+                CWE843_Type_Confusion__short_82_goodG2B.cpp# tokens[0] = filename
+                18446744073709551615#   tokens[1] = line
+                18446744073709551615#   tokens[2] = col 
+                int8_t *#               tokens[3] = TypeName
+                39020968#               tokens[4] = ConstValue
+                526828848944628746#     tokens[5] = Hash1
+                11854005139656696112#   tokens[6] = Hash2
+                Alloca#                 tokens[7] = AllocatorName
+                _ZN31CWE843_Type_Confusion__short_8239CWE843_Type_Confusion__short_82_goodG2B6actionEPv# tokens[8] = CallerName
+                0#                       tokens[9] =        inlined line 
+                0#                       tokens[10] =        inclined column 
+                38927856#                tokens[11] =        BB ID
+                38926376#                tokens[12] =        IR ID
+                3#                       tokens[13] =        TID
+                */
+                AllocationPointMeta _AllocPointMeta = AllocationPointMeta
+                                                        (
+                                                            tokens[0], // FileName
+                                                            ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
+                                                            ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                            ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
+                                                            ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
+                                                            ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
+                                                            ((tokens[9].size() != 0) ? std::stoull(tokens[9]) : 0), // inlined line 
+                                                            ((tokens[10].size() != 0) ? std::stoull(tokens[10]) : 0), // inclined column 
+                                                            ((tokens[11].size() != 0) ? std::stoull(tokens[11]) : 0), // BB ID
+                                                            ((tokens[12].size() != 0) ? std::stoull(tokens[12]) : 0), // IR ID
+                                                            ((tokens[13].size() != 0) ? std::stoull(tokens[13]) : 0), // TID
+                                                            0, // MC BB ID
+                                                            0, // MC Inst. ID
+                                                            (tokens[7]), //Allocator Name                                                    
+                                                            (tokens[3]), // TypeName
+                                                            (tokens[8]) //Caller Name
+                                                        );
+
+                stackSlots[offset] = StackSlot(fi, 
+                                        size, 
+                                        isSpillSlot == 1 ? true : false, 
+                                        alignment, 
+                                        fixed == 1 ? true : false, 
+                                        offset,
+                                        _AllocPointMeta
+                                        );
+                
+                numberOfObjectsOnStack--;
+            }
+   
+        }
+        else if (key == "ARGMETA")
+        {
+            answer = line.substr(8, line.size() - 1);
+            DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            
+            if (answer == "NOMETA")
+            {
+                argumetSlots[numberOfArguments] = AllocationPointMeta();
+                numberOfArguments--;
+            }
+            else
+            {
+
+                // seperate the information by #
+                std::istringstream ss(answer);
+                std::string token;
+                std::vector<std::string> tokens;
+                while(std::getline(ss, token, '#')) {
+                    tokens.push_back(token);
+                }
+
+                if (tokens.size() != 14)
+                {
+                    DPRINTF(StackTypeMetadata, "SYM: %s\n", answer);
+                    for (size_t i = 0; i < tokens.size(); i++)
+                    {
+
+                        DPRINTF(StackTypeMetadata, "Tokens[%d] = %s\n", i, tokens[i]);
+                    }
+                    
+                    assert(tokens.size() == 14 && "Tokens size is not equal to 14!\n" );
+
+                }
+
+                DPRINTF(StackTypeMetadata, "Tokens[0]: %s "
+                                    "Tokens[1]: %s " 
+                                    "Tokens[2]: %s "
+                                    "Tokens[3]: %s "
+                                    "Tokens[4]: %s "
+                                    "Tokens[5]: %s "
+                                    "Tokens[6]: %s "
+                                    "Tokens[7]: %s "
+                                    "Tokens[8]: %s "
+                                    "Tokens[9]: %s "
+                                    "Tokens[10]: %s "
+                                    "Tokens[11]: %s "
+                                    "Tokens[12]: %s "
+                                    "Tokens[13]: %s\n",
+                                    tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5],
+                                    tokens[6],tokens[7],tokens[8],tokens[9],tokens[10],tokens[11],
+                                    tokens[12],tokens[13]);
+
+                /*              
+                CWE843_Type_Confusion__short_82_goodG2B.cpp# tokens[0] = filename
+                18446744073709551615#   tokens[1] = line
+                18446744073709551615#   tokens[2] = col 
+                int8_t *#               tokens[3] = TypeName
+                39020968#               tokens[4] = ConstValue
+                526828848944628746#     tokens[5] = Hash1
+                11854005139656696112#   tokens[6] = Hash2
+                Alloca#                 tokens[7] = AllocatorName
+                _ZN31CWE843_Type_Confusion__short_8239CWE843_Type_Confusion__short_82_goodG2B6actionEPv# tokens[8] = CallerName
+                0#                       tokens[9] =        inlined line 
+                0#                       tokens[10] =        inclined column 
+                38927856#                tokens[11] =        BB ID
+                38926376#                tokens[12] =        IR ID
+                3#                       tokens[13] =        TID
+                */
+                AllocationPointMeta _AllocPointMeta = AllocationPointMeta
+                                                        (
+                                                            tokens[0], // FileName
+                                                            ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
+                                                            ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                            ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
+                                                            ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
+                                                            ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
+                                                            ((tokens[9].size() != 0) ? std::stoull(tokens[9]) : 0), // inlined line 
+                                                            ((tokens[10].size() != 0) ? std::stoull(tokens[10]) : 0), // inclined column 
+                                                            ((tokens[11].size() != 0) ? std::stoull(tokens[11]) : 0), // BB ID
+                                                            ((tokens[12].size() != 0) ? std::stoull(tokens[12]) : 0), // IR ID
+                                                            ((tokens[13].size() != 0) ? std::stoull(tokens[13]) : 0), // TID
+                                                            0, // MC BB ID
+                                                            0, // MC Inst. ID
+                                                            (tokens[7]), //Allocator Name                                                    
+                                                            (tokens[3]), // TypeName
+                                                            (tokens[8]) //Caller Name
+                                                        );
+
+                argumetSlots[numberOfArguments] = _AllocPointMeta;
+                
+                numberOfArguments--;
+            }
+   
+        }
+        else if (key == "RETMETA")
+        {
+            answer = line.substr(8, line.size() - 1);
+            DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
+            AllocationPointMeta _returnTypeMeta;
+            if (answer == "NOMETA")
+            {
+                // do nothing
+            }
+            else
+            {
+
+                // seperate the information by #
+                std::istringstream ss(answer);
+                std::string token;
+                std::vector<std::string> tokens;
+                while(std::getline(ss, token, '#')) {
+                    tokens.push_back(token);
+                }
+
+                if (tokens.size() != 14)
+                {
+                    DPRINTF(StackTypeMetadata, "SYM: %s\n", answer);
+                    for (size_t i = 0; i < tokens.size(); i++)
+                    {
+
+                        DPRINTF(StackTypeMetadata, "Tokens[%d] = %s\n", i, tokens[i]);
+                    }
+                    
+                    assert(tokens.size() == 14 && "Tokens size is not equal to 14!\n" );
+
+                }
+
+                DPRINTF(StackTypeMetadata, "Tokens[0]: %s "
+                                    "Tokens[1]: %s " 
+                                    "Tokens[2]: %s "
+                                    "Tokens[3]: %s "
+                                    "Tokens[4]: %s "
+                                    "Tokens[5]: %s "
+                                    "Tokens[6]: %s "
+                                    "Tokens[7]: %s "
+                                    "Tokens[8]: %s "
+                                    "Tokens[9]: %s "
+                                    "Tokens[10]: %s "
+                                    "Tokens[11]: %s "
+                                    "Tokens[12]: %s "
+                                    "Tokens[13]: %s\n",
+                                    tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5],
+                                    tokens[6],tokens[7],tokens[8],tokens[9],tokens[10],tokens[11],
+                                    tokens[12],tokens[13]);
+
+                /*              
+                CWE843_Type_Confusion__short_82_goodG2B.cpp# tokens[0] = filename
+                18446744073709551615#   tokens[1] = line
+                18446744073709551615#   tokens[2] = col 
+                int8_t *#               tokens[3] = TypeName
+                39020968#               tokens[4] = ConstValue
+                526828848944628746#     tokens[5] = Hash1
+                11854005139656696112#   tokens[6] = Hash2
+                Alloca#                 tokens[7] = AllocatorName
+                _ZN31CWE843_Type_Confusion__short_8239CWE843_Type_Confusion__short_82_goodG2B6actionEPv# tokens[8] = CallerName
+                0#                       tokens[9] =        inlined line 
+                0#                       tokens[10] =        inclined column 
+                38927856#                tokens[11] =        BB ID
+                38926376#                tokens[12] =        IR ID
+                3#                       tokens[13] =        TID
+                */
+                _returnTypeMeta = AllocationPointMeta
+                                                        (
+                                                            tokens[0], // FileName
+                                                            ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
+                                                            ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                            ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
+                                                            ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
+                                                            ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
+                                                            ((tokens[9].size() != 0) ? std::stoull(tokens[9]) : 0), // inlined line 
+                                                            ((tokens[10].size() != 0) ? std::stoull(tokens[10]) : 0), // inclined column 
+                                                            ((tokens[11].size() != 0) ? std::stoull(tokens[11]) : 0), // BB ID
+                                                            ((tokens[12].size() != 0) ? std::stoull(tokens[12]) : 0), // IR ID
+                                                            ((tokens[13].size() != 0) ? std::stoull(tokens[13]) : 0), // TID
+                                                            0, // MC BB ID
+                                                            0, // MC Inst. ID
+                                                            (tokens[7]), //Allocator Name                                                    
+                                                            (tokens[3]), // TypeName
+                                                            (tokens[8]) //Caller Name
+                                                        );
+
+                // now insert the whole function object into the TC
+                assert(functionName != "" && "Empty Function Name!\n");
+                assert(numberOfArguments == 0 && numberOfObjectsOnStack == 0 && "");
                 auto it = sym_names.begin();
                 for ( ; it != sym_names.end(); it++)
                 {
                     if (it->second == functionName)
                         break;
                 }
+                
                 assert(it != sym_names.end() && "");
-                tc->FunctionObjectsBuffer[it->first] = StackObject(functionName, numberOfObjects, stackSlots);
+                tc->FunctionObjectsBuffer[it->first] = FunctionObject(functionName, stackSlots, argumetSlots, _returnTypeMeta);
+                argumetSlots.clear();
                 stackSlots.clear();
             }
+            
         }
     }
 
@@ -824,4 +1137,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
 
 
 }
+
+
+
 

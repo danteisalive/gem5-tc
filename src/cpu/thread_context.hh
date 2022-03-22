@@ -71,7 +71,7 @@ namespace TheISA
     class TypeMetadataInfo;
     class TypeEntryInfo;
     class AllocationPointMeta;
-    class StackObject;
+    class FunctionObject;
 }
 class BaseCPU;
 class BaseTLB;

@@ -75,6 +75,7 @@
 #include "sim/full_system.hh"
 #include "sim/process.hh"
 #include "debug/TypeMetadata.hh"
+#include "debug/StackTypeMetadata.hh"
 #include "base/loader/object_file.hh"
 #include "base/loader/elf_object.hh"
 
@@ -293,7 +294,8 @@ class TyCHEAllocationPoint : public AllocationPointMeta {
                 AP_CALLOC_BASE_COLLECT  = 0x10,
                 AP_CALLOC_SIZE_COLLECT  = 0x11,
                 AP_REALLOC_BASE_COLLECT = 0x12,
-                AP_REALLOC_SIZE_COLLECT  = 0x13
+                AP_REALLOC_SIZE_COLLECT  = 0x13,
+                AP_STACK                = 0x14
             };
 
         private:
@@ -359,6 +361,8 @@ class TyCHEAllocationPoint : public AllocationPointMeta {
                         return "AP_REALLOC_BASE_COLLECT";
                     case CheckType::AP_REALLOC_SIZE_COLLECT:
                         return "AP_REALLOC_SIZE_COLLECT";
+                    case CheckType::AP_STACK:
+                        return "AP_STACK";
                     default:
                     {
                         assert(0);
@@ -1040,7 +1044,7 @@ class StackSlot
         uint64_t Alignment;
         bool Fixed;
         int Offset;
-        TypeEntryInfo TypeInfo;
+        AllocationPointMeta TypeInfo;
     
     public:
         StackSlot(
@@ -1050,7 +1054,7 @@ class StackSlot
             uint64_t _Alignment,
             bool _Fixed,
             int _Offset,
-            TypeEntryInfo _TypeInfo
+            AllocationPointMeta _TypeInfo
         )
         {
             Valid       = true;
@@ -1132,24 +1136,21 @@ class FunctionObject
     private:
         bool        Valid;
         std::string FunctionName;
-        int NumberOfObjectsOnStack;
         //     OFFSET 
         std::map<int, StackSlot> StackSlots;
         //      REG ID   TYPE INFO
-        std::map<int, TypeEntryInfo> ArgumentSlots;
-        TypeEntryInfo                ReturnType;
+        std::map<int, AllocationPointMeta> ArgumentSlots;
+        AllocationPointMeta                ReturnType;
 
     public:
         FunctionObject(
             std::string _FunctionName,
-            int _NumberOfObjectsOnStack,
             std::map<int, StackSlot> _StackSlots,
-            std::map<int, TypeEntryInfo> _ArgumentSlots,
-            TypeEntryInfo                _ReturnType
+            std::map<int, AllocationPointMeta> _ArgumentSlots,
+            AllocationPointMeta                _ReturnType
         )
         {
             Valid = true;
-            NumberOfObjectsOnStack = _NumberOfObjectsOnStack;
             FunctionName = _FunctionName;
             StackSlots = _StackSlots;
             ArgumentSlots = _ArgumentSlots;
@@ -1169,7 +1170,6 @@ class FunctionObject
             this->Valid = so.Valid;
             this->FunctionName = so.FunctionName;
             this->StackSlots = so.StackSlots;
-            this->NumberOfObjectsOnStack = so.NumberOfObjectsOnStack;
             this->ReturnType = so.ReturnType;
             this->ArgumentSlots = so.ArgumentSlots;
         }
@@ -1182,7 +1182,6 @@ class FunctionObject
             this->Valid = so.Valid;
             this->FunctionName = so.FunctionName;
             this->StackSlots = so.StackSlots;
-            this->NumberOfObjectsOnStack = so.NumberOfObjectsOnStack;
             this->ReturnType = so.ReturnType;
             this->ArgumentSlots = so.ArgumentSlots;
             return (*this);
@@ -1195,13 +1194,11 @@ class FunctionObject
             assert(so.Valid && "Printing an invalid FunctionObject\n");
 
                     ccprintf(out, "FunctionObject:" 
-                                "\n\tNumber of Objects On Stack = %d"
                                 "\n\tFunction Name = %s\n", 
-                                so.NumberOfObjectsOnStack,
                                 so.FunctionName
                                 );
                     
-                    for (auto const& arg : so.ArgumentSlots)
+                    for (auto& arg : so.ArgumentSlots)
                     {
                         ccprintf(out, "Arg[%s] = %s", 
                                     TheISA::IntRegIndexStr(arg.first),
@@ -1213,7 +1210,7 @@ class FunctionObject
                     
                     ccprintf(out, "Return Type = %s\n", so.ReturnType);
 
-                    for (auto const& slot : so.StackSlots)
+                    for (auto& slot : so.StackSlots)
                     {
                         ccprintf(out, "Offset[%d] = %s", 
                                     slot.first,
