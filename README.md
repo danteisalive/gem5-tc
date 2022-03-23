@@ -10,3 +10,5 @@ SquashMech
 AliasCache
 PointerDepGraph
 TypeCheck
+MetadataType
+StackMetadataType
