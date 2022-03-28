@@ -741,6 +741,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
     std::string line;
     std::map<int, StackSlot>     stackSlots;
     std::map<int, AllocationPointMeta> argumetSlots;
+    std::map<int, AllocationPointMeta> returnTypeSlots;
     while (std::getline(input, line))
     {
         std::istringstream iss(line);
@@ -806,7 +807,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
             assert(numberOfArguments >= 0 && "numberOfArguments < 0\n");
 
             numberOfReturnObject = std::stoi(tokens[2]);
-            assert((numberOfReturnObject == 0 || numberOfReturnObject == 1) && 
+            assert((numberOfReturnObject == 1) && 
                     "(numberOfReturnObject != 0 && numberOfReturnObject != 1)\n");
         }
         else if (key == "OBJ")
@@ -829,13 +830,14 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
 
             if (answer == "NOMETA")
             {
+                AllocationPointMeta _AllocPointMetaNull;
                 stackSlots[offset] = StackSlot(fi, 
                                         size, 
                                         isSpillSlot == 1 ? true : false, 
                                         alignment, 
                                         fixed == 1 ? true : false, 
                                         offset,
-                                        AllocationPointMeta()
+                                        _AllocPointMetaNull
                                         );
                 numberOfObjectsOnStack--;
             }
@@ -934,10 +936,11 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
         {
             answer = line.substr(8, line.size() - 1);
             DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
-            
+            assert(numberOfArguments > 0 && "numberOfArguments <= 0!\n");
             if (answer == "NOMETA")
             {
-                argumetSlots[numberOfArguments] = AllocationPointMeta();
+                AllocationPointMeta _AllocPointMetaNull;
+                argumetSlots[numberOfArguments] = _AllocPointMetaNull;
                 numberOfArguments--;
             }
             else
@@ -1028,10 +1031,13 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
         {
             answer = line.substr(8, line.size() - 1);
             DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
-            AllocationPointMeta _returnTypeMeta;
+            assert(numberOfReturnObject > 0 && "numberOfReturnObject <= 0!\n");
             if (answer == "NOMETA")
             {
                 // do nothing
+                AllocationPointMeta _returnTypeMeta;
+                returnTypeSlots[numberOfReturnObject] = _returnTypeMeta;
+                numberOfReturnObject--;
             }
             else
             {
@@ -1091,7 +1097,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                 38926376#                tokens[12] =        IR ID
                 3#                       tokens[13] =        TID
                 */
-                _returnTypeMeta = AllocationPointMeta
+                AllocationPointMeta _returnTypeMeta = AllocationPointMeta
                                                         (
                                                             tokens[0], // FileName
                                                             ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
@@ -1110,22 +1116,30 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                                                             (tokens[3]), // TypeName
                                                             (tokens[8]) //Caller Name
                                                         );
-
-                // now insert the whole function object into the TC
-                assert(functionName != "" && "Empty Function Name!\n");
-                assert(numberOfArguments == 0 && numberOfObjectsOnStack == 0 && "");
-                auto it = sym_names.begin();
-                for ( ; it != sym_names.end(); it++)
-                {
-                    if (it->second == functionName)
-                        break;
-                }
-                
-                assert(it != sym_names.end() && "");
-                tc->FunctionObjectsBuffer[it->first] = FunctionObject(functionName, stackSlots, argumetSlots, _returnTypeMeta);
-                argumetSlots.clear();
-                stackSlots.clear();
+                returnTypeSlots[numberOfReturnObject] = _returnTypeMeta;
+                numberOfReturnObject--;
             }
+
+            if (numberOfReturnObject == 0)
+            {
+                    // now insert the whole function object into the TC
+                    assert(functionName != "" && "Empty Function Name!\n");
+                    // we should have parsed all the args and stack objects
+                    assert(numberOfArguments == 0 && numberOfObjectsOnStack == 0 && "");
+                    auto it = sym_names.begin();
+                    for ( ; it != sym_names.end(); it++)
+                    {
+                        if (it->second == functionName)
+                            break;
+                    }
+                    
+                    assert(it != sym_names.end() && "");
+                    tc->FunctionObjectsBuffer[it->first] = FunctionObject(functionName, stackSlots, argumetSlots, returnTypeSlots);
+                    argumetSlots.clear();
+                    stackSlots.clear();
+                    returnTypeSlots.clear();
+            }
+            
             
         }
     }

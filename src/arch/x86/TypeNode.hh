@@ -1137,24 +1137,24 @@ class FunctionObject
         bool        Valid;
         std::string FunctionName;
         //     OFFSET 
-        std::map<int, StackSlot> StackSlots;
+        std::map<int, StackSlot>            StackSlots;
         //      REG ID   TYPE INFO
-        std::map<int, AllocationPointMeta> ArgumentSlots;
-        AllocationPointMeta                ReturnType;
+        std::map<int, AllocationPointMeta>  ArgumentSlots;
+        std::map<int, AllocationPointMeta>  ReturnTypes;
 
     public:
         FunctionObject(
             std::string _FunctionName,
             std::map<int, StackSlot> _StackSlots,
             std::map<int, AllocationPointMeta> _ArgumentSlots,
-            AllocationPointMeta                _ReturnType
+            std::map<int, AllocationPointMeta> _ReturnType
         )
         {
             Valid = true;
             FunctionName = _FunctionName;
             StackSlots = _StackSlots;
             ArgumentSlots = _ArgumentSlots;
-            ReturnType = _ReturnType;
+            ReturnTypes = _ReturnType;
         }
 
         FunctionObject()
@@ -1170,7 +1170,7 @@ class FunctionObject
             this->Valid = so.Valid;
             this->FunctionName = so.FunctionName;
             this->StackSlots = so.StackSlots;
-            this->ReturnType = so.ReturnType;
+            this->ReturnTypes = so.ReturnTypes;
             this->ArgumentSlots = so.ArgumentSlots;
         }
 
@@ -1182,7 +1182,7 @@ class FunctionObject
             this->Valid = so.Valid;
             this->FunctionName = so.FunctionName;
             this->StackSlots = so.StackSlots;
-            this->ReturnType = so.ReturnType;
+            this->ReturnTypes = so.ReturnTypes;
             this->ArgumentSlots = so.ArgumentSlots;
             return (*this);
         }
@@ -1200,15 +1200,13 @@ class FunctionObject
                     
                     for (auto& arg : so.ArgumentSlots)
                     {
-                        ccprintf(out, "Arg[%s] = %s", 
+                        ccprintf(out, "Argument[%s] = %s", 
                                     TheISA::IntRegIndexStr(arg.first),
                                     arg.second
                                     );
                     }
                     
                     ccprintf(out, "\n");
-                    
-                    ccprintf(out, "Return Type = %s\n", so.ReturnType);
 
                     for (auto& slot : so.StackSlots)
                     {
@@ -1219,6 +1217,15 @@ class FunctionObject
                     }
                     ccprintf(out, "\n");
                     
+                    for (auto& ret : so.ReturnTypes)
+                    {
+                        ccprintf(out, "Return[%d] = %s", 
+                                    ret.first,
+                                    ret.second
+                                    );
+                    }
+                    ccprintf(out, "\n");
+
                     return out;
         }
 
