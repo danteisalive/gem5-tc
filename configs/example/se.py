@@ -124,7 +124,9 @@ Options.addSEOptions(parser)
 
 
 parser.add_option("--enable-capability", default=False,action ="store_true",help="""Enable capability mode.""")
-parser.add_option("--symbol-file",default="",help="""The symbol file to initiliaze type cache.""")
+parser.add_option("--heapAllocationPointFile",default="",help="""The heapAllocationPointFile file to initiliaze type cache.""")
+parser.add_option("--stackAllocationPointsFile",default="",help="""The stackAllocationPointsFile file to initiliaze type cache.""")
+parser.add_option("--stackObjectsFile",default="",help="""The stackObjectsFile file to initiliaze type cache.""")
 parser.add_option("--elf-file",default="",help="""""")
 if '--ruby' in sys.argv:
     Ruby.define_options(parser)
@@ -173,11 +175,15 @@ CPUClass.numThreads = numThreads
 CPUClass.branchPred.numThreads = numThreads
 
 CPUClass.enable_capability = options.enable_capability
-CPUClass.symbol_file = options.symbol_file
+CPUClass.heapAllocationPointFile = options.heapAllocationPointFile
+CPUClass.stackAllocationPointsFile = options.stackAllocationPointsFile
+CPUClass.stackObjectsFile = options.stackObjectsFile
 
 if FutureClass != None:
     FutureClass.enable_capability = options.enable_capability
-    FutureClass.symbol_file = options.symbol_file
+    FutureClass.heapAllocationPointFile = options.heapAllocationPointFile
+    FutureClass.stackAllocationPointsFile = options.stackAllocationPointsFile
+    FutureClass.stackObjectsFile = options.stackObjectsFile
 
 
 # Check -- do not allow SMT with multiple CPUs

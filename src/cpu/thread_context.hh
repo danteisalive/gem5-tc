@@ -138,7 +138,9 @@ class ThreadContext
     };
 
     bool enableCapability;
-    std::string symbolsFile;
+    std::string heapAllocationPointFile;
+    std::string stackAllocationPointsFile;
+    std::string stackObjectsFile;
     uint64_t num_of_allocations;
     uint64_t ap_pid;
     uint64_t ap_size;

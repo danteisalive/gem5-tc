@@ -402,15 +402,18 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         std::cout << "CPU O3 Initilization: " << std::endl;
         o3_tc->enableCapability = params->enable_capability;
-        o3_tc->symbolsFile = params->symbol_file;
+        o3_tc->heapAllocationPointFile = params->heapAllocationPointFile;
+        o3_tc->stackAllocationPointsFile = params->stackAllocationPointsFile;
+        o3_tc->stackObjectsFile = params->stackObjectsFile;
         o3_tc->Collector_Status = ThreadContext::NONE;
         o3_tc->num_of_allocations = 0;
 
         o3_tc->FunctionSymbols = VG_newFM(interval_tree_Cmp );
         o3_tc->interval_tree = VG_newFM(interval_tree_Cmp );
         o3_tc->FunctionsToIgnore = VG_newFM(interval_tree_Cmp);
-        DPRINTF(Capability, "SymbolFile[%i] process is %s\n",
-                        tid, params->symbol_file);
+        DPRINTF(Capability, "HeapAllocationPointFile[%i] process is %s\n", tid, params->heapAllocationPointFile);
+        DPRINTF(Capability, "StackAllocationPointsFile[%i] process is %s\n", tid, params->stackAllocationPointsFile);
+        DPRINTF(Capability, "StackObjectsFile[%i] process is %s\n", tid, params->stackObjectsFile);
 
 
 
@@ -443,13 +446,16 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         readVirtualTable(seglist[seglist.size()-1].c_str(), o3_tc);
         readAllocationPointsSymbols(seglist[seglist.size()-1].c_str(), o3_tc);
         
-        readFunctionObjects(seglist[seglist.size()-1].c_str(), "stack_objects.hash", o3_tc);
-        assert(0);
-        if (o3_tc->enableCapability) 
-            assert(o3_tc->symbolsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
 
-        readTypeMetadata(o3_tc->symbolsFile.c_str(), o3_tc);
-        readTypeMetadata("stack_allocation_points.hash", o3_tc);
+        if (o3_tc->enableCapability) {
+            assert(o3_tc->heapAllocationPointFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
+            assert(o3_tc->stackAllocationPointsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
+            assert(o3_tc->stackObjectsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
+        }
+        readFunctionObjects(seglist[seglist.size()-1].c_str(), o3_tc->stackObjectsFile.c_str(), o3_tc);
+        assert(0);
+        readTypeMetadata(o3_tc->heapAllocationPointFile.c_str(), o3_tc);
+        readTypeMetadata(o3_tc->stackAllocationPointsFile.c_str(), o3_tc);
         
 
 

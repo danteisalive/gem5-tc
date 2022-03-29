@@ -97,7 +97,9 @@ AtomicSimpleCPU::AtomicSimpleCPU(AtomicSimpleCPUParams *p)
     numOfMemRefs = 0;
     numOfHeapAccesses = 0;
     threadContexts[0]->enableCapability = p->enable_capability;
-    threadContexts[0]->symbolsFile = p->symbol_file;
+    threadContexts[0]->heapAllocationPointFile = p->heapAllocationPointFile;
+    threadContexts[0]->stackAllocationPointsFile = p->stackAllocationPointsFile;
+    threadContexts[0]->stackObjectsFile = p->stackObjectsFile;
     threadContexts[0]->Collector_Status = ThreadContext::NONE;
     threadContexts[0]->AtomicPID = 0;
     threadContexts[0]->num_of_allocations = 0;
