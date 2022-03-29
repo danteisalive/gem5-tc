@@ -100,8 +100,8 @@ class AllocationPointMeta
     private:
         bool Valid;
         std::string FileName;
-        int64_t     lineNum;
-        int64_t     ColNume;
+        uint64_t     lineNum;
+        uint64_t     ColNume;
         uint64_t    ConstValue;
         uint64_t    Hash1;
         uint64_t    Hash2;
@@ -128,8 +128,8 @@ class AllocationPointMeta
         AllocationPointMeta() {
             Valid = false;
             FileName = "";
-            lineNum = -1;
-            ColNume = -1;
+            lineNum = 0;
+            ColNume = 0;
             TypeName = "";
             ConstValue = 0;
             Hash1 = 0;
@@ -145,10 +145,30 @@ class AllocationPointMeta
             CallerName = "";
         }
 
+        AllocationPointMeta(std::string _CallerName) {
+            Valid = true;
+            FileName = "";
+            lineNum = 0;
+            ColNume = 0;
+            TypeName = "";
+            ConstValue = 0;
+            Hash1 = 0;
+            Hash2 = 0;
+            InlinedlineNum = 0;
+            InlinedColNume = 0;
+            IRBBID = 0;
+            IRInstID = 0;
+            MCBBID = 0;
+            MCInstID = 0;
+            AllocatorName = "";
+            TypeName = "";
+            CallerName = _CallerName;
+        }
+
         AllocationPointMeta(
                 std::string _FileName,
-                int64_t     _lineNum,
-                int64_t     _ColNume,
+                uint64_t     _lineNum,
+                uint64_t     _ColNume,
                 uint64_t    _ConstValue,
                 uint64_t    _Hash1,
                 uint64_t    _Hash2,
@@ -1045,6 +1065,7 @@ class StackSlot
         bool Fixed;
         int Offset;
         AllocationPointMeta TypeInfo;
+        bool hasMeta;
     
     public:
         StackSlot(
@@ -1054,7 +1075,8 @@ class StackSlot
             uint64_t _Alignment,
             bool _Fixed,
             int _Offset,
-            AllocationPointMeta _TypeInfo
+            AllocationPointMeta _TypeInfo,
+            bool _hasMeta
         )
         {
             Valid       = true;
@@ -1065,6 +1087,7 @@ class StackSlot
             Fixed       = _Fixed       ;
             Offset      = _Offset      ;
             TypeInfo    = _TypeInfo    ;
+            hasMeta     = _hasMeta      ;
         }
 
         StackSlot()
@@ -1083,7 +1106,8 @@ class StackSlot
             this->Alignment   = ss.Alignment   ;
             this->Fixed       = ss.Fixed       ;
             this->Offset      = ss.Offset      ;  
-            this->TypeInfo    = ss.TypeInfo    ;          
+            this->TypeInfo    = ss.TypeInfo    ;   
+            this->hasMeta     = ss.hasMeta      ;       
         }
 
         StackSlot& operator= (const StackSlot& ss)
@@ -1099,6 +1123,7 @@ class StackSlot
             this->Fixed       = ss.Fixed       ;
             this->Offset      = ss.Offset      ; 
             this->TypeInfo    = ss.TypeInfo    ;   
+            this->hasMeta     = ss.hasMeta      ;
 
             return (*this);
         }
@@ -1108,15 +1133,15 @@ class StackSlot
         friend std::ostream& operator << (std::ostream& out, const StackSlot& ss )
         {
             assert(ss.Valid && "Printing an invalid StackSlot\n");
-
-                    ccprintf(out, "StackSlot:"
-                                "\tFi = %d"
-                                "\tSize = %llu"
-                                "\tIsSpillSlot = %d"
-                                "\tAlignment = %llu"
-                                "\tFixed = %d" 
-                                "\tOffset = %d", 
-                                "\tTypeInfo = %s\n", 
+            if (ss.hasMeta)
+                ccprintf(out, "StackSlot:"
+                                " Fi = %d"
+                                " Size = %llu"
+                                " IsSpillSlot = %d"
+                                " Alignment = %llu"
+                                " Fixed = %d" 
+                                " Offset = %d"
+                                " TypeInfo = %s\n", 
                                 ss.Fi,         
                                 ss.Size,       
                                 ss.IsSpillSlot,
@@ -1125,6 +1150,23 @@ class StackSlot
                                 ss.Offset,
                                 ss.TypeInfo       
                             );
+            else 
+                ccprintf(out, "StackSlot:"
+                                " Fi = %d"
+                                " Size = %llu"
+                                " IsSpillSlot = %d"
+                                " Alignment = %llu"
+                                " Fixed = %d" 
+                                " Offset = %d"
+                                " TypeInfo = No Meta\n", 
+                                ss.Fi,         
+                                ss.Size,       
+                                ss.IsSpillSlot,
+                                ss.Alignment,
+                                ss.Fixed,      
+                                ss.Offset     
+                            );
+
                     return out;
         }
 
@@ -1200,8 +1242,8 @@ class FunctionObject
                     
                     for (auto& arg : so.ArgumentSlots)
                     {
-                        ccprintf(out, "Argument[%s] = %s", 
-                                    TheISA::IntRegIndexStr(arg.first),
+                        ccprintf(out, "Argument[%d] = %s", 
+                                    arg.first,
                                     arg.second
                                     );
                     }

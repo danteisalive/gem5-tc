@@ -255,8 +255,8 @@ bool readTypeMetadata(const char* file_name, ThreadContext *tc)
             AllocationPointMeta _AllocPointMeta = AllocationPointMeta
                                                 (
                                                     tokens[0], // FileName
-                                                    ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
-                                                    ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                    ((tokens[1].size() != 0) ? std::stoull(tokens[1]) : 0), // line 
+                                                    ((tokens[2].size() != 0) ? std::stoull(tokens[2]) : 0), // column
                                                     ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
                                                     ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
                                                     ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
@@ -742,17 +742,10 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
     std::map<int, StackSlot>     stackSlots;
     std::map<int, AllocationPointMeta> argumetSlots;
     std::map<int, AllocationPointMeta> returnTypeSlots;
-    while (std::getline(input, line))
-    {
-        std::istringstream iss(line);
-        std::string key, answer;
-        iss >> key;
-
-        std::string functionName = "";
-        int numberOfArguments = 0;
-        int numberOfObjectsOnStack = 0;
-        int numberOfReturnObject = 0;
-
+    std::string functionName = "";
+    int numberOfArguments = 0;
+    int numberOfObjectsOnStack = 0;
+    int numberOfReturnObject = 0;
         /*
         int fi
         unsigned long long size (0, ~ULL, > 0)
@@ -767,6 +760,13 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
         uint64_t alignment = UINT64_MAX;
         int fixed = -1;
         int offset = INT_MIN;
+    while (std::getline(input, line))
+    {
+        std::istringstream iss(line);
+        std::string key, answer;
+        iss >> key;
+
+
         // DPRINTF(StackTypeMetadata, "KEY: %s\n", key);
         // DPRINTF(StackTypeMetadata, "RAW: %s\n", line);
         
@@ -809,6 +809,10 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
             numberOfReturnObject = std::stoi(tokens[2]);
             assert((numberOfReturnObject == 1) && 
                     "(numberOfReturnObject != 0 && numberOfReturnObject != 1)\n");
+            DPRINTF(StackTypeMetadata, "numberOfObjectsOnStack: %d numberOfArguments: %d numberOfReturnObject=%d\n", 
+                                        numberOfObjectsOnStack,
+                                        numberOfArguments,
+                                        numberOfReturnObject);
         }
         else if (key == "OBJ")
         {
@@ -816,9 +820,10 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
             DPRINTF(StackTypeMetadata, "Key: %s Answer: %s\n", key, answer);
             assert(numberOfObjectsOnStack >= 1 && "numberOfObjectsOnStack <= 0\n");
 
-
             std::stringstream ss(answer);
             ss >> fi >> size >> isSpillSlot >> alignment >> fixed >> offset;
+            DPRINTF(StackTypeMetadata, "fi=%d size=%llu isSpillSlot=%d alignment=%llu fixed=%d offset=%d\n",
+                    fi, size, isSpillSlot, alignment, fixed, offset);
             assert((isSpillSlot == 0 || isSpillSlot == 1) && "wrong value for isSpillSlot!\n");
             assert((fixed == 0 || fixed == 1) && "wrong value for fixed!\n");
             
@@ -837,7 +842,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                                         alignment, 
                                         fixed == 1 ? true : false, 
                                         offset,
-                                        _AllocPointMetaNull
+                                        _AllocPointMetaNull, 
+                                        false
                                         );
                 numberOfObjectsOnStack--;
             }
@@ -902,8 +908,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                 AllocationPointMeta _AllocPointMeta = AllocationPointMeta
                                                         (
                                                             tokens[0], // FileName
-                                                            ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
-                                                            ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                            ((tokens[1].size() != 0) ? std::stoull(tokens[1]) : 0), // line 
+                                                            ((tokens[2].size() != 0) ? std::stoull(tokens[2]) : 0), // column
                                                             ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
                                                             ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
                                                             ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
@@ -925,7 +931,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                                         alignment, 
                                         fixed == 1 ? true : false, 
                                         offset,
-                                        _AllocPointMeta
+                                        _AllocPointMeta,
+                                        true
                                         );
                 
                 numberOfObjectsOnStack--;
@@ -939,8 +946,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
             assert(numberOfArguments > 0 && "numberOfArguments <= 0!\n");
             if (answer == "NOMETA")
             {
-                AllocationPointMeta _AllocPointMetaNull;
-                argumetSlots[numberOfArguments] = _AllocPointMetaNull;
+                AllocationPointMeta _AllocPointMeta = AllocationPointMeta(functionName);
+                argumetSlots[numberOfArguments] = _AllocPointMeta;
                 numberOfArguments--;
             }
             else
@@ -1004,8 +1011,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                 AllocationPointMeta _AllocPointMeta = AllocationPointMeta
                                                         (
                                                             tokens[0], // FileName
-                                                            ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
-                                                            ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                            ((tokens[1].size() != 0) ? std::stoull(tokens[1]) : 0), // line 
+                                                            ((tokens[2].size() != 0) ? std::stoull(tokens[2]) : 0), // column
                                                             ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
                                                             ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
                                                             ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
@@ -1035,7 +1042,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
             if (answer == "NOMETA")
             {
                 // do nothing
-                AllocationPointMeta _returnTypeMeta;
+                AllocationPointMeta _returnTypeMeta = AllocationPointMeta(functionName);;
                 returnTypeSlots[numberOfReturnObject] = _returnTypeMeta;
                 numberOfReturnObject--;
             }
@@ -1100,8 +1107,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                 AllocationPointMeta _returnTypeMeta = AllocationPointMeta
                                                         (
                                                             tokens[0], // FileName
-                                                            ((tokens[1].size() != 0) ? std::stoi(tokens[1]) : 0), // line 
-                                                            ((tokens[2].size() != 0) ? std::stoi(tokens[2]) : 0), // column
+                                                            ((tokens[1].size() != 0) ? std::stoull(tokens[1]) : 0), // line 
+                                                            ((tokens[2].size() != 0) ? std::stoull(tokens[2]) : 0), // column
                                                             ((tokens[4].size() != 0) ? std::stoull(tokens[4]) : 0), // ConstValue
                                                             ((tokens[5].size() != 0) ? std::stoull(tokens[5]) : 0), // Hash1
                                                             ((tokens[6].size() != 0) ? std::stoull(tokens[6]) : 0), // Hash2
@@ -1126,6 +1133,7 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                     assert(functionName != "" && "Empty Function Name!\n");
                     // we should have parsed all the args and stack objects
                     assert(numberOfArguments == 0 && numberOfObjectsOnStack == 0 && "");
+                    DPRINTF(StackTypeMetadata, "functionName = %s\n", functionName);
                     auto it = sym_names.begin();
                     for ( ; it != sym_names.end(); it++)
                     {

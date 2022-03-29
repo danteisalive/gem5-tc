@@ -453,7 +453,6 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
             assert(o3_tc->stackObjectsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
         }
         readFunctionObjects(seglist[seglist.size()-1].c_str(), o3_tc->stackObjectsFile.c_str(), o3_tc);
-        assert(0);
         readTypeMetadata(o3_tc->heapAllocationPointFile.c_str(), o3_tc);
         readTypeMetadata(o3_tc->stackAllocationPointsFile.c_str(), o3_tc);
         
@@ -479,6 +478,11 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
         for (auto const & elem : o3_tc->AllocationPointMetaBuffer)
         {
             DPRINTF(TypeMetadata, "DUMPING AllocationPointMetaBuffer:\n %s", elem.second);
+        }
+
+        for (auto const & elem : o3_tc->FunctionObjectsBuffer)
+        {
+            DPRINTF(StackTypeMetadata, "DUMPING AllocationPointMetaBuffer: PC = %#x\n %s", elem.first, elem.second);
         }
 
         UWord keyW, valW;
@@ -614,7 +618,7 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         }
 
-        assert(0);
+        // assert(0);
 
 
 

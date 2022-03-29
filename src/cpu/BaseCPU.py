@@ -143,7 +143,9 @@ class BaseCPU(MemObject):
     socket_id = Param.Unsigned(0, "Physical Socket identifier")
     numThreads = Param.Unsigned(1, "number of HW thread contexts")
     enable_capability = Param.Bool(False, "Enable Capability")
-    symbol_file = Param.String("", "Symboles used for capability checks")
+    heapAllocationPointFile = Param.String("", "Symboles used for capability checks")
+    stackAllocationPointsFile = Param.String("", "Symboles used for capability checks")
+    stackObjectsFile = Param.String("", "Symboles used for capability checks")
     pwr_gating_latency = Param.Cycles(300,
         "Latency to enter power gating state when all contexts are suspended")
 
