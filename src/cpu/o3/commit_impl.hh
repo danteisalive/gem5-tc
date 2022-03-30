@@ -73,6 +73,7 @@
 #include "debug/Allocator.hh"
 #include "debug/AliasCache.hh"
 #include "debug/PointerDepGraph.hh"
+#include "debug/TrackFunctionObject.hh"
 
 using namespace std;
 
@@ -1411,6 +1412,21 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                         head_inst->seqNum, head_inst->pcState(),
                         head_inst->pcState().npc() ,
                         cpu->readArchIntReg(X86ISA::INTREG_RAX, tid));
+    }
+
+    if (tc->enableCapability && head_inst->isCall())
+    {
+        if(tc->FunctionObjectsBuffer.find(head_inst->pcState().npc()) != tc->FunctionObjectsBuffer.end())
+        {
+            DPRINTF(TrackFunctionObject,"Call Instruction Committed [sn:%lli] PC= %s "
+                            " NextPC: %#lx\n",
+                            head_inst->seqNum, head_inst->pcState(),
+                            head_inst->pcState().npc());
+            FunctionProfile* fp = new FunctionProfile(cpu->params()->system->kernelSymtab, 
+                                                    tc->FunctionObjectsBuffer[head_inst->instAddr()]);
+            cpu->thread[0]->activationRecords.push(fp);
+        }
+
     }
 
     if (tc->enableCapability){

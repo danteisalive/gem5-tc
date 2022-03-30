@@ -61,6 +61,7 @@
 #include "mem/page_table.hh"
 #include "sim/process.hh"
 #include "arch/TypeNode.hh"
+// #include "cpu/profile.hh"
 //#include "arch/stacktrace.hh"
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
@@ -168,6 +169,7 @@ class ThreadContext
     AllocationPointMetaTable            AllocationPointMetaBuffer;
     VirtualTables                       VirtualTablesBuffer;
     FunctionObjects                     FunctionObjectsBuffer;
+    
 
 
     enum Status

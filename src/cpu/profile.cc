@@ -92,6 +92,12 @@ FunctionProfile::FunctionProfile(const SymbolTable *_symtab)
     Stats::registerResetCallback(reset);
 }
 
+FunctionProfile::FunctionProfile(const SymbolTable *_symtab, const TheISA::FunctionObject _funcObj) 
+    : symtab(_symtab), functionObject(_funcObj) 
+{
+
+}
+
 FunctionProfile::~FunctionProfile()
 {
     if (reset)

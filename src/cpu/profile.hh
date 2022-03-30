@@ -37,6 +37,7 @@
 #include "base/types.hh"
 #include "config/the_isa.hh"
 #include "cpu/static_inst.hh"
+#include "arch/TypeNode.hh"
 
 class ThreadContext;
 
@@ -69,8 +70,11 @@ class FunctionProfile
     std::map<Addr, Counter> pc_count;
     TheISA::StackTrace trace;
 
+    const TheISA::FunctionObject functionObject;
+    
   public:
     FunctionProfile(const SymbolTable *symtab);
+    FunctionProfile(const SymbolTable *symtab, const TheISA::FunctionObject funcObj);
     ~FunctionProfile();
 
     ProfileNode *consume(ThreadContext *tc, const StaticInstPtr &inst);

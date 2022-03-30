@@ -183,6 +183,7 @@ struct ThreadState : public Serializable {
   public:
     FunctionProfile *profile;
     ProfileNode *profileNode;
+    std::stack<FunctionProfile*>        activationRecords;
     Addr profilePC;
     EndQuiesceEvent *quiesceEvent;
 
