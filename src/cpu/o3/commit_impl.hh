@@ -1414,17 +1414,33 @@ DefaultCommit<Impl>::commitHead(DynInstPtr &head_inst, unsigned inst_num)
                         cpu->readArchIntReg(X86ISA::INTREG_RAX, tid));
     }
 
-    if (tc->enableCapability && head_inst->isCall())
+    // logic for updating activation records
+    if (tc->enableCapability && false)
     {
-        if(tc->FunctionObjectsBuffer.find(head_inst->pcState().npc()) != tc->FunctionObjectsBuffer.end())
+        if (head_inst->isCall())
         {
-            DPRINTF(TrackFunctionObject,"Call Instruction Committed [sn:%lli] PC= %s "
-                            " NextPC: %#lx\n",
-                            head_inst->seqNum, head_inst->pcState(),
-                            head_inst->pcState().npc());
-            FunctionProfile* fp = new FunctionProfile(cpu->params()->system->kernelSymtab, 
-                                                    tc->FunctionObjectsBuffer[head_inst->instAddr()]);
-            cpu->thread[0]->activationRecords.push(fp);
+            if(tc->FunctionObjectsBuffer.find(head_inst->pcState().npc()) != tc->FunctionObjectsBuffer.end())
+            {
+                DPRINTF(TrackFunctionObject,"Call Instruction Committed [sn:%lli] PC= %s "
+                                " NextPC: %#lx\n",
+                                head_inst->seqNum, head_inst->pcState(),
+                                head_inst->pcState().npc());
+                FunctionProfile* fp = new FunctionProfile(cpu->params()->system->kernelSymtab, 
+                                                        tc->FunctionObjectsBuffer[head_inst->pcState().npc()]);
+                cpu->thread[0]->activationRecords.push(fp);
+            }
+        }
+        else if (!cpu->thread[0]->activationRecords.empty() && 
+                 head_inst->isReturn())
+        {
+            FunctionProfile* fp =  cpu->thread[0]->activationRecords.top();
+            cpu->thread[0]->activationRecords.pop();
+            delete fp;
+        }
+        else if (!cpu->thread[0]->activationRecords.empty() &&
+                (head_inst->isLoad() || head_inst->isStore()))
+        {
+            updateFunctionActivationRecord(head_inst);
         }
 
     }
@@ -2116,6 +2132,40 @@ DefaultCommit<Impl>::findCurrentStackTop(DynInstPtr& head_inst)
     }
 
     return 0;
+}
+
+
+template<class Impl>
+void
+DefaultCommit<Impl>::updateFunctionActivationRecord(DynInstPtr& head_inst)
+{
+    assert((head_inst->isLoad() || head_inst->isStore()) && "head_inst is not a load/store instruction\n");
+    if (head_inst->isMicroopInjected()) return;
+
+    std::pair<Addr, Addr> startAndSize = cpu->thread[0]->activationRecords.top()->getFunctionObject().getFunctionStartAddressAndSize();
+    Addr startAddr = startAndSize.first;
+    Addr endAddr = startAndSize.first + startAndSize.second;
+    assert(head_inst->pcState().instAddr() >= startAddr && head_inst->pcState().instAddr() <= endAddr  && "");
+    for (size_t i = 0; i < head_inst->staticInst->numSrcRegs(); i++) 
+    {
+        if (head_inst->srcRegIdx(i).isIntReg())
+        {
+            
+            uint16_t dest_reg_idx = head_inst->staticInst->srcRegIdx(i).index();
+            if (dest_reg_idx != X86ISA::INTREG_RSP) continue;
+            //assert(head_inst->numIntDestRegs() == 1 && "findCurrentStackTop:: Invalid number of dest regs!\n");
+            // read the data
+            //uint64_t  dataRegContent = head_inst->readDestReg(head_inst->staticInst.get(), 0); 
+            
+            DPRINTF(TrackFunctionObject, "updateFunctionActivationRecord: [SeqNum = %d] Stack Address: %x\n",
+                    head_inst->seqNum, head_inst->effAddr);
+            
+            break;
+
+
+        }
+    }
+
 }
 
 #endif//__CPU_O3_COMMIT_IMPL_HH__

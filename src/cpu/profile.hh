@@ -82,6 +82,7 @@ class FunctionProfile
     void clear();
     void dump(ThreadContext *tc, std::ostream &out) const;
     void sample(ProfileNode *node, Addr pc);
+    TheISA::FunctionObject getFunctionObject() const {return functionObject;}
 };
 
 inline ProfileNode *

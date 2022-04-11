@@ -1178,6 +1178,8 @@ class FunctionObject
     private:
         bool        Valid;
         std::string FunctionName;
+        Addr        StartAddr;
+        Addr        FunctionSize;
         //     OFFSET 
         std::map<int, StackSlot>            StackSlots;
         //      REG ID   TYPE INFO
@@ -1187,6 +1189,8 @@ class FunctionObject
     public:
         FunctionObject(
             std::string _FunctionName,
+            Addr _StartAddr,
+            Addr _FunctionSize,
             std::map<int, StackSlot> _StackSlots,
             std::map<int, AllocationPointMeta> _ArgumentSlots,
             std::map<int, AllocationPointMeta> _ReturnType
@@ -1197,6 +1201,8 @@ class FunctionObject
             StackSlots = _StackSlots;
             ArgumentSlots = _ArgumentSlots;
             ReturnTypes = _ReturnType;
+            StartAddr = _StartAddr;
+            FunctionSize = _FunctionSize;
         }
 
         FunctionObject()
@@ -1214,6 +1220,8 @@ class FunctionObject
             this->StackSlots = so.StackSlots;
             this->ReturnTypes = so.ReturnTypes;
             this->ArgumentSlots = so.ArgumentSlots;
+            this->StartAddr = so.StartAddr;
+            this->FunctionSize = so.FunctionSize;
         }
 
         FunctionObject& operator= (const FunctionObject& so)
@@ -1226,6 +1234,8 @@ class FunctionObject
             this->StackSlots = so.StackSlots;
             this->ReturnTypes = so.ReturnTypes;
             this->ArgumentSlots = so.ArgumentSlots;
+            this->StartAddr = so.StartAddr;
+            this->FunctionSize = so.FunctionSize;
             return (*this);
         }
 
@@ -1236,8 +1246,10 @@ class FunctionObject
             assert(so.Valid && "Printing an invalid FunctionObject\n");
 
                     ccprintf(out, "FunctionObject:" 
-                                "\n\tFunction Name = %s\n", 
-                                so.FunctionName
+                                "\n\tFunction Name = %s StartAddr = %#x FunctionSize = %#x\n", 
+                                so.FunctionName,
+                                so.StartAddr,
+                                so.FunctionSize
                                 );
                     
                     for (auto& arg : so.ArgumentSlots)
@@ -1270,6 +1282,8 @@ class FunctionObject
 
                     return out;
         }
+
+        std::pair<Addr,Addr> getFunctionStartAddressAndSize() const { return std::make_pair(StartAddr, FunctionSize); }
 
 };
 

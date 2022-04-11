@@ -1142,7 +1142,8 @@ bool readFunctionObjects(const char* exec_file_name, const char* stack_objects_f
                     }
                     
                     assert(it != sym_names.end() && "");
-                    tc->FunctionObjectsBuffer[it->first] = FunctionObject(functionName, stackSlots, argumetSlots, returnTypeSlots);
+                    assert(sym_sizes.find(it->first) != sym_sizes.end() && "");
+                    tc->FunctionObjectsBuffer[it->first] = FunctionObject(functionName, it->first, sym_sizes[it->first], stackSlots, argumetSlots, returnTypeSlots);
                     argumetSlots.clear();
                     stackSlots.clear();
                     returnTypeSlots.clear();
