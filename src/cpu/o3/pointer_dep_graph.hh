@@ -116,13 +116,14 @@ class PointerDependencyGraph
     void doCommit(DynInstPtr &inst);
     void updatePIDWithTypeTracker(DynInstPtr &inst, ThreadContext* tc);
     void doUpdateForNoneLoadMicroops(DynInstPtr& inst);
-    void updatePointerTrackerForStoreMicroop(DynInstPtr &inst);
+    void updatePointerTrackerForStoreMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForAddMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForSubMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForLeaMicroop(DynInstPtr &inst, ThreadContext* tc);
     void updatePointerTrackerForAPBaseCollectorMicroops(DynInstPtr &inst, ThreadContext* tc);
     void updateBoundsCheckMicroop(DynInstPtr &inst);
     bool updateTypeTrackerState();
+    void updateRegistersPointerID(DynInstPtr &inst);
     /** Debugging function to dump out the dependency graph.
      */
     void dump(DynInstPtr &inst);

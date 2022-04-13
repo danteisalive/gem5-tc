@@ -353,7 +353,7 @@ template <class Impl>
 void
 PointerDependencyGraph<Impl>::updatePIDWithTypeTracker(DynInstPtr &inst, ThreadContext* tc)
 {
-    if (inst->isStore()) {updatePointerTrackerForStoreMicroop(inst); return;}
+    if (inst->isStore()) {updatePointerTrackerForStoreMicroop(inst, tc); return;}
     else if (inst->isBoundsCheckMicroop()) {updateBoundsCheckMicroop(inst);return;}
     // some instructions need to be verifed at the exec stage to make sure that their 
     // propagations are correct. If not correct, we will run an update. This is modeled by a 
@@ -478,8 +478,25 @@ PointerDependencyGraph<Impl>::PerformSanityCheck(DynInstPtr &inst)
     }
     else if (inst->isFreeCallMicroop())
     {
-        assert(inst->dyn_pid  != TheISA::PointerID(0) && 
-                "isFreeCallMicroop :: Found a Free Call Microop with zero PID Parameter!\n");
+        // assert(inst->dyn_pid  != TheISA::PointerID(0) && 
+        //         "isFreeCallMicroop :: Found a Free Call Microop with zero PID Parameter!\n");
+        if (inst->dyn_pid  == TheISA::PointerID(0))
+        {
+            std::ofstream TyCHEAliasSanityCheckFile;
+            TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
+            TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+            TyCHEAliasSanityCheckFile << 
+                        "PerformSanityCheck ::  Found a Free Call Microop with zero PID Parameter!!\n" <<
+                        "SeqNum: " << inst->seqNum << " " << 
+                        "PC: " << inst->pcState() << " " << 
+                        "Inst: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << " " << 
+                        "inst->dyn_pid =" << inst->dyn_pid << " " <<
+                        "CommitArchRegsPid[RDI] = " << CommitArchRegsPid[X86ISA::INTREG_RDI] << "\n";
+                
+            // File Close
+            TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+            TyCHEAliasSanityCheckFile.close();
+        }
     }
     else if (inst->isFreeRetMicroop())
     {
@@ -962,7 +979,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
         DPRINTF(PointerDepGraph, " Enabling Type Tracker! Malloc/Calloc base collector is called! Assigned PID=%s!\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RAX]);
         
-        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
+        
         isTypeTrackerEnabled = true;
     }
     else if (track && inst->isMallocSizeCollectorMicroop())
@@ -972,7 +989,7 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
                                         PointerDepEntry(inst, TheISA::PointerID(0)));
         FetchArchRegsPid[X86ISA::INTREG_RDI] = TheISA::PointerID(0);
         inst->dyn_pid = FetchArchRegsPid[X86ISA::INTREG_RDI];
-        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+        
         isTypeTrackerEnabled = false;
 
         DPRINTF(PointerDepGraph, "Malloc/Calloc size collector is called! Disabling the type tracker!\n");
@@ -1031,8 +1048,8 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
         DPRINTF(PointerDepGraph, "Free is returning! Invalidating PID=%s\n", 
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
 
-        // typeTrackerStatus = ThreadContext::COLLECTOR_STATUS::NONE;
         isTypeTrackerEnabled = true;
+        updateRegistersPointerID(inst);
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "lea")  {TransferLeaMicroops(inst, track, false);}
@@ -2295,7 +2312,7 @@ PointerDependencyGraph<Impl>::TransferXorImmMicroops(DynInstPtr &inst, bool trac
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::updatePointerTrackerForStoreMicroop(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::updatePointerTrackerForStoreMicroop(DynInstPtr &inst, ThreadContext* tc)
 {
 
         assert((inst->staticInst->getName() == "st" || inst->staticInst->getName() == "stis") && 
@@ -2315,7 +2332,7 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForStoreMicroop(DynInstPtr &in
 
         uint16_t src0 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(0)); src0 = src0;//index
         uint16_t src1 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(1)); src1 = src1;//base
-        uint16_t src2 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); //data
+        uint16_t src2 = x86_inst->getUnflattenRegIndex(inst->srcRegIdx(2)); src2 = src2;//data
         
         DPRINTF(PointerDepGraph, "Store Instruction Before Update: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
                 inst->seqNum,
@@ -2324,8 +2341,17 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForStoreMicroop(DynInstPtr &in
                 inst->dyn_pid,
                 inst->staticInst->getStaticPointerID());
 
-        inst->dyn_pid = CommitArchRegsPid[src2];
-        inst->staticInst->setStaticPointerID(CommitArchRegsPid[src2]);
+        // search through the TODO
+        // read the data
+        uint64_t  dataRegContent = 
+            inst->readIntRegOperand(inst->staticInst.get(), 2); // src(2) is the data register
+            
+        TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
+        //inst->dyn_pid = CommitArchRegsPid[src2];
+        // inst->staticInst->setStaticPointerID(CommitArchRegsPid[src2]);
+        inst->staticInst->setStaticPointerID(_pid);
+        inst->dyn_pid = _pid;
+
 
         DPRINTF(PointerDepGraph, "Updated PID for Store Instruction: [%d][%s][%s][Dyn: %s][Static: %s]\n", 
                 inst->seqNum,
@@ -2805,6 +2831,13 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(Dyn
     dump();
 
     // assert(0);
+}
+
+template <class Impl>
+void
+PointerDependencyGraph<Impl>::updateRegistersPointerID(DynInstPtr &inst)
+{
+
 }
 
 #endif // __CPU_O3_DEP_GRAPH_HH__

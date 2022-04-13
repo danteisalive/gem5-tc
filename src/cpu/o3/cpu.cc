@@ -449,12 +449,12 @@ FullO3CPU<Impl>::FullO3CPU(DerivO3CPUParams *params)
 
         if (o3_tc->enableCapability) {
             assert(o3_tc->heapAllocationPointFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
-            assert(o3_tc->stackAllocationPointsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
-            assert(o3_tc->stackObjectsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
+            //assert(o3_tc->stackAllocationPointsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
+            //assert(o3_tc->stackObjectsFile != "" && "CPU running in capability mode enbaled but without metadata information!\n");
         }
-        readFunctionObjects(seglist[seglist.size()-1].c_str(), o3_tc->stackObjectsFile.c_str(), o3_tc);
+        //readFunctionObjects(seglist[seglist.size()-1].c_str(), o3_tc->stackObjectsFile.c_str(), o3_tc);
         readTypeMetadata(o3_tc->heapAllocationPointFile.c_str(), o3_tc);
-        readTypeMetadata(o3_tc->stackAllocationPointsFile.c_str(), o3_tc);
+        //readTypeMetadata(o3_tc->stackAllocationPointsFile.c_str(), o3_tc);
         
 
 
