@@ -2457,13 +2457,15 @@ PointerDependencyGraph<Impl>::doUpdateForNoneLoadMicroops(DynInstPtr& inst)
             //if found: update and return
             if (it->inst->seqNum == inst->seqNum) {
                 // get the actual PID for this load
-                TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+                // TheISA::PointerID _pid = inst->macroop->getMacroopPid();
+                TheISA::PointerID _pid = inst->staticInst->getStaticPointerID();
                 // insert an entry for the destination reg
                 X86ISA::X86StaticInst * x86_inst = (X86ISA::X86StaticInst *)inst->staticInst.get();
                 uint16_t dest = x86_inst->getUnflattenRegIndex(inst->destRegIdx(0)); //dest
                 inst->FetchArchRegsPid[dest] = _pid;
                 it->pid = _pid;
                 found = true;
+                DPRINTF(PointerDepGraph, "doUpdateForNonLoadMicroops:: Microop Static PID=%s\n", _pid);
                 break;
 
             }
@@ -2566,7 +2568,7 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForSubMicroop(DynInstPtr &inst
     // this is logically equal to a comparison
     TheISA::PointerID _pid = readPIDFromIntervalTree(dataRegContent, tc); 
 
-    DPRINTF(PointerDepGraph, "updatePointerTrackerForAddMicroop:: Checking Alias for dataRegContent[%s]=%x=%s\n", 
+    DPRINTF(PointerDepGraph, "updatePointerTrackerForSubMicroop:: Checking Alias for dataRegContent[%s]=%x=%s\n", 
                             TheISA::IntRegIndexStr(dest), dataRegContent, _pid);
 
     // our assumption is that all the add instructions always transfer thier sources to thier 
@@ -2574,7 +2576,7 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForSubMicroop(DynInstPtr &inst
     // in this case we need to update the pointer tracker 
     if (_pid == TheISA::PointerID(0) && inst->dyn_pid != _pid)
     {
-        DPRINTF(PointerDepGraph, "updatePointerTrackerForAddMicroop:: Update is needed as Sub microop is not synced! inst->dyn_pid%s != %s\n", 
+        DPRINTF(PointerDepGraph, "updatePointerTrackerForSubMicroop:: Update is needed as Sub microop is not synced! inst->dyn_pid%s != %s\n", 
                             inst->dyn_pid, _pid);
         inst->dyn_pid = _pid;
         inst->staticInst->setStaticPointerID(_pid);  
