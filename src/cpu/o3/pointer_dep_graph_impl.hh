@@ -1743,12 +1743,28 @@ PointerDependencyGraph<Impl>::TransferSubMicroops(DynInstPtr &inst, bool track, 
 
         //These are just for normal sub instructions as their result affect other int regs
         // this is not acceptable for Sub/SubBig
-        panic_if((dataSize == 8) &&
+        if((dataSize == 8) &&
                 (CommitArchRegsPid[src1] != TheISA::PointerID(0) && 
                 CommitArchRegsPid[src0] != TheISA::PointerID(0) &&
-                CommitArchRegsPid[src1] != CommitArchRegsPid[src0]), 
-                "TransferSubMicroops :: Found a Sub inst with both src regs non-zero non-equal PID! "
-                "SRC1 = %s SRC2 = %s\n", CommitArchRegsPid[src0], CommitArchRegsPid[src1]);
+                CommitArchRegsPid[src1] != CommitArchRegsPid[src0]))
+        {
+                std::ofstream TyCHEAliasSanityCheckFile;
+                TyCHEAliasSanityCheckFile.open("./m5out/AliasSanity.tyche", std::ios_base::app);
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+                
+                TyCHEAliasSanityCheckFile << "Failed to verify TransferSubInst!\n";
+                TyCHEAliasSanityCheckFile << 
+                    "TransferSubMicroops :: Found a Sub inst with both src regs non-zero non-equal PID!\n" <<
+                    "SeqNum: " << inst->seqNum << " " << 
+                    "PC: " << inst->pcState() << " " << 
+                    "Inst: " << inst->staticInst->disassemble(inst->pcState().instAddr()) << " " << 
+                    "SRC1 =" << CommitArchRegsPid[src0] << " " <<
+                    "SRC2 = " << CommitArchRegsPid[src1] << "\n";
+            
+                // File Close
+                TyCHEAliasSanityCheckFile << "---------------------------------------\n";
+                TyCHEAliasSanityCheckFile.close();
+        }
         // dest = src0(PID(0)) - src1(PID(n))
         panic_if((dataSize == 8) && 
                 (inst_sub != nullptr || inst_sub_big != nullptr) &&

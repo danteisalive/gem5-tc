@@ -1814,7 +1814,7 @@ DefaultCommit<Impl>::collector(ThreadID tid, DynInstPtr &inst)
             tc->num_of_allocations++;
             tc->Collector_Status = ThreadContext::COLLECTOR_STATUS::NONE;
 
-            assert(0);
+            //assert(0);
     }
   }
 
