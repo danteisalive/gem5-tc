@@ -7,3 +7,5 @@ Capability,TypeTracker,Allocator,SquashMech,AliasCache,PointerDepGraph,TypeCheck
 
 
 /u/as3mx/gem5-tc/build/X86/gem5.opt --debug-flags=Exec --debug-file=Type.exec  /u/as3mx/gem5-tc/configs/example/se.py -c  ./perlbench_base.TEST -o "-I./lib checkspam.pl 2500 5 25 11 150 1 1 1 1" --caches --l2cache --cpu-type=O3_X86_skylake_1 --mem-type=DDR4_2400_16x4 --mem-size=8GB --mem-channels=2  --enable-capability --heapAllocationPointFile=./allocation_points.hash
+
+/u/as3mx/gem5-tc/build/X86/gem5.opt --debug-start=444165500 --debug-flags=Capability,TypeTracker,Allocator,SquashMech,AliasCache,PointerDepGraph,TypeCheck --debug-file=Type.all  /u/as3mx/gem5-tc/configs/example/se.py -c  ./perlbench_base.TEST -o "-I./lib checkspam.pl 2500 5 25 11 150 1 1 1 1" --caches --l2cache --cpu-type=O3_X86_skylake_1 --mem-type=DDR4_2400_16x4 --mem-size=8GB --mem-channels=2  --enable-capability --heapAllocationPointFile=./allocation_points.hash

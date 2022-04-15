@@ -2015,6 +2015,8 @@ void
 FullO3CPU<Impl>::updateCPUCollectorStatus(ThreadID tid, InstSeqNum squashedSeqNum)
 {
 
+    assert(0);
+
     if (!this->threadContexts[tid]->enableCapability) return;
 
     DPRINTF(Allocator, "Collectors Status Before Squashing: Front-End:%x Back-End:%x\n",

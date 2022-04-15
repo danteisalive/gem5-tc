@@ -45,6 +45,7 @@
 
 #include "cpu/o3/comm.hh"
 #include "debug/TypeTracker.hh"
+#include "debug/Allocator.hh"
 #include "cpu/o3/pointer_dep_graph.hh"
 #include "debug/PointerDepGraph.hh"
 
@@ -97,7 +98,7 @@ PointerDependencyGraph<Impl>::insert(DynInstPtr &inst)
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::doSquash(const DynInstPtr squashedInst, uint64_t squashedSeqNum){
+PointerDependencyGraph<Impl>::doSquash(ThreadContext* tc, const DynInstPtr squashedInst, uint64_t squashedSeqNum){
 
    
     DPRINTF(PointerDepGraph, "Squashing Alias Until Sequence Number: [%d]\n", squashedSeqNum);
@@ -171,6 +172,8 @@ PointerDependencyGraph<Impl>::doSquash(const DynInstPtr squashedInst, uint64_t s
 
     DPRINTF(PointerDepGraph, "Dependency Graph After Squashing:\n");
     dump();
+
+    updateRegistersPointerID(tc);
 }
 
 
@@ -1049,7 +1052,6 @@ PointerDependencyGraph<Impl>::InternalUpdate(DynInstPtr &inst, bool track)
                 FetchArchRegsPid[X86ISA::INTREG_RDI]);
 
         isTypeTrackerEnabled = true;
-        updateRegistersPointerID(inst);
     }
     else if (inst->staticInst->getName() == "mov")  {TransferMovMicroops(inst, track, false);}
     else if (inst->staticInst->getName() == "lea")  {TransferLeaMicroops(inst, track, false);}
@@ -2853,9 +2855,76 @@ PointerDependencyGraph<Impl>::updatePointerTrackerForAPBaseCollectorMicroops(Dyn
 
 template <class Impl>
 void
-PointerDependencyGraph<Impl>::updateRegistersPointerID(DynInstPtr &inst)
+PointerDependencyGraph<Impl>::updateRegistersPointerID(ThreadContext* tc)
 {
 
+    DPRINTF(Allocator, "updateRegistersPointerID::Collectors Status Before Squashing: Front-End:%d Back-End:%d\n",
+                tc->forntend_collector_status, tc->Collector_Status);
+    // first get the latest commit stage collector status
+    tc->forntend_collector_status = tc->Collector_Status;
+
+    std::map<uint64_t, uint64_t> MicroopsInOrder;
+    // order the microops that are tracked after this pointer refill
+    for (size_t indx = 0; indx < TheISA::NumIntRegs; indx++) {
+        // Erase  (C++11 and later)
+        for (auto it = dependGraph[indx].cbegin(); it != dependGraph[indx].cend(); it++)
+        {
+            MicroopsInOrder.insert(std::make_pair(it->inst->seqNum, indx));    
+        }
+    }
+
+    for (auto &microop: MicroopsInOrder)
+    {
+        uint64_t SeqNumber = microop.first;
+        uint64_t Indx = microop.second;
+        for (auto it = dependGraph[Indx].begin(); it != dependGraph[Indx].end(); it++)
+        {
+            if (it->inst->seqNum == SeqNumber) 
+            {
+                DPRINTF(Allocator, "Instruction: PC:%#x [sn:%lli] Issued:%i Squashed:%i\n",
+                    it->inst->instAddr(),
+                    it->inst->seqNum, 
+                    it->inst->isIssued(),
+                    it->inst->isSquashed());
+
+
+                if (it->inst->isMallocBaseCollectorMicroop() ||
+                        it->inst->isCallocBaseCollectorMicroop() || 
+                        it->inst->isReallocBaseCollectorMicroop() ||
+                        it->inst->isFreeRetMicroop())
+                {
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::NONE;
+                }
+                else if (it->inst->isCallocSizeCollectorMicroop())
+                {
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::CALLOC_SIZE;
+                }
+                else if (it->inst->isMallocSizeCollectorMicroop())
+                {
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::MALLOC_SIZE;
+                }
+                else if (it->inst->isReallocSizeCollectorMicroop())
+                {
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::REALLOC_SIZE;
+                }
+                else if (it->inst->isFreeCallMicroop())
+                {
+                    tc->forntend_collector_status = ThreadContext::COLLECTOR_STATUS::FREE_CALL;
+                }                
+            }
+            break;
+        } 
+            
+    }
+    
+    DPRINTF(Allocator, "updateRegistersPointerID::Collectors Status After Squashing: Front-End:%d Back-End:%d\n",
+                tc->forntend_collector_status, tc->Collector_Status);
+    
+
+
+
 }
+
+
 
 #endif // __CPU_O3_DEP_GRAPH_HH__

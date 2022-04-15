@@ -106,7 +106,7 @@ class PointerDependencyGraph
     void insert(DynInstPtr &new_inst);
 
 
-    void doSquash(const DynInstPtr squashedInst, uint64_t squashedSeqNum);
+    void doSquash(ThreadContext* tc, const DynInstPtr squashedInst, uint64_t squashedSeqNum);
 
     void doUpdate(DynInstPtr& inst);
     void InternalUpdate(DynInstPtr &inst, bool track);
@@ -123,7 +123,7 @@ class PointerDependencyGraph
     void updatePointerTrackerForAPBaseCollectorMicroops(DynInstPtr &inst, ThreadContext* tc);
     void updateBoundsCheckMicroop(DynInstPtr &inst);
     bool updateTypeTrackerState();
-    void updateRegistersPointerID(DynInstPtr &inst);
+    void updateRegistersPointerID(ThreadContext* tc);
     /** Debugging function to dump out the dependency graph.
      */
     void dump(DynInstPtr &inst);
